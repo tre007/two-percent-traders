@@ -26,18 +26,18 @@
 // The `price` and `change` fields are placeholders until live API.
 // ------------------------------------------------------------
 export const scoreboard = [
-  { symbol: 'S&P 500', price: 5847.23, change: 0.42 },
-  { symbol: 'DOW',     price: 42183,   change: 0.29 },
-  { symbol: 'BRENT',   price: 76.34,   change: -1.12 },
-  { symbol: 'GOLD',    price: 4663.50, change: 1.18 },
-  { symbol: 'SILVER',  price: 52.78,   change: 2.04 },
-  { symbol: 'GDX',     price: 86.42,   change: 2.31 },
-  { symbol: 'XLE',     price: 62.18,   change: -0.87 },
-  { symbol: 'BTC',     price: 105234,  change: -1.54 },
-  { symbol: 'ETH',     price: 3547,    change: -2.11 },
-  { symbol: 'SOL',     price: 184.50,  change: -3.04 },
-  { symbol: 'VIX',     price: 18.22,   change: 4.23 },
-  { symbol: 'DXY',     price: 99.34,   change: -0.12 },
+  { symbol: 'SPY',   price: null, change: null },  // S&P 500 ETF
+  { symbol: 'QQQ',   price: null, change: null },  // Nasdaq-100 ETF
+  { symbol: 'USO',   price: null, change: null },  // Oil ETF
+  { symbol: 'GLD',   price: null, change: null },  // Gold ETF
+  { symbol: 'SLV',   price: null, change: null },  // Silver ETF
+  { symbol: 'GDX',   price: null, change: null },  // Gold Miners ETF
+  { symbol: 'XLE',   price: null, change: null },  // Energy ETF
+  { symbol: 'BTC',   price: null, change: null },  // Bitcoin
+  { symbol: 'ETH',   price: null, change: null },  // Ethereum
+  { symbol: 'SOL',   price: null, change: null },  // Solana
+  { symbol: 'VIXY',  price: null, change: null },  // Volatility ETF
+  { symbol: 'UUP',   price: null, change: null },  // Dollar Bullish ETF
 ]
 
 

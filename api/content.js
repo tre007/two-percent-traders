@@ -1,31 +1,26 @@
 // ============================================================
-// /api/content.js — Fetches watchlist + deep dive from Google Sheets
+// /api/content.js -- Fetches watchlist + deep dive from Google Sheets
 // ============================================================
-// Your Google Sheet should have two tabs (sheet names matter):
-//   • "watchlist"  - columns: symbol, name, thesis
-//   • "deepdive"   - single row: issue, date, title, summary, discordUrl
+// Sheet structure:
+//   Tab "watchlist": columns = symbol, name, thesis, price (optional)
+//   Tab "deepdive":  columns = issue, date, title, summary, discordUrl
 //
-// How to set it up:
-//   1. Create a new Google Sheet
-//   2. Name the first tab "watchlist", add columns + rows
-//   3. Add a second tab "deepdive", one row of content
-//   4. File → Share → Anyone with the link (Viewer)
-//   5. File → Share → Publish to web → Entire document → CSV
-//   6. Copy the Sheet ID from the URL (the long string between /d/ and /edit)
-//   7. Set SHEET_ID in Vercel env vars: GOOGLE_SHEET_ID=xxxxx
+// The 'price' column is optional. When filled in, the site uses that
+// value and skips the live API for that row. When blank, the live API
+// provides the price automatically.
 //
-// You edit the sheet from your phone, site picks it up within 5 minutes.
-// If the fetch fails, the UI falls back to data.js values gracefully.
+// Use cases:
+//   - Custom rows (e.g. "Test", "My portfolio value")
+//   - Tickers the live API doesn't support (spot gold, physical silver)
+//   - Entry/target price reference points
 // ============================================================
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID
 
-// Google Sheets CSV export URL format
 function sheetUrl(sheetName) {
   return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`
 }
 
-// Minimal CSV parser (handles quoted fields with commas inside)
 function parseCSV(text) {
   const rows = []
   let row = []
@@ -71,7 +66,6 @@ function parseCSV(text) {
   return rows
 }
 
-// Turn CSV rows into list of objects using first row as keys
 function csvToObjects(rows) {
   if (rows.length < 2) return []
   const headers = rows[0].map((h) => h.trim().toLowerCase())
@@ -94,22 +88,28 @@ async function fetchSheet(sheetName) {
 export default async function handler(req, res) {
   if (!SHEET_ID) {
     return res.status(500).json({
-      error: 'GOOGLE_SHEET_ID not set. Add it in Vercel → Settings → Environment Variables.',
+      error: 'GOOGLE_SHEET_ID not set. Add it in Vercel env vars.',
     })
   }
 
   try {
-    // Fetch both tabs in parallel
     const [watchlistRows, deepdiveRows] = await Promise.all([
       fetchSheet('watchlist'),
       fetchSheet('deepdive'),
     ])
 
-    const watchlist = watchlistRows.map((r) => ({
-      symbol: r.symbol,
-      name: r.name,
-      thesis: r.thesis,
-    }))
+    // Parse optional price column. Strips dollar signs and commas
+    // so people can type "$4,726" or "4726" or "4,726.50" and it works.
+    const watchlist = watchlistRows.map((r) => {
+      const priceStr = (r.price || '').replace(/[$,\s]/g, '')
+      const priceNum = priceStr.length > 0 ? parseFloat(priceStr) : null
+      return {
+        symbol: r.symbol,
+        name: r.name,
+        thesis: r.thesis,
+        manualPrice: (priceNum != null && !isNaN(priceNum)) ? priceNum : null,
+      }
+    })
 
     const first = deepdiveRows[0] || {}
     const deepDive = {
@@ -120,7 +120,6 @@ export default async function handler(req, res) {
       discordUrl: first.discordurl || first.discord_url || '#',
     }
 
-    // Cache at the edge for 5 minutes
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     res.status(200).json({
       watchlist,

@@ -1,71 +1,104 @@
 // ============================================================
 // /api/sparklines.js -- Serverless function on Vercel
 // ============================================================
-// Returns 7-day closing prices for each ticker, used to draw
-// sparklines in the scoreboard cards.
+// Uses Twelve Data's time_series endpoint to fetch 7 days of
+// daily closing prices for each ticker. Used to draw sparklines
+// in the scoreboard cards.
 //
-// Fetches Finnhub's /stock/candle endpoint (daily resolution).
-// Edge-cached for 10 minutes -- sparklines show daily trend, so
-// they don't need the 30-second refresh that current prices get.
+// Why Twelve Data instead of Finnhub:
+//   Finnhub moved /stock/candle to paid tier in 2025.
+//   Twelve Data's free tier (800 calls/day) supports daily
+//   bars for stocks, ETFs, and crypto on one endpoint.
+//
+// Edge-cached for 10 minutes since daily bars don't change
+// intraday meaningfully.
 // ============================================================
 
-const FINNHUB_BASE = 'https://finnhub.io/api/v1'
+const TD_BASE = 'https://api.twelvedata.com'
 const DAYS = 7
 
+// Twelve Data uses different symbol formats than Finnhub.
+// Stocks/ETFs: plain ticker (e.g. "SPY")
+// Crypto: "BTC/USD" format (not Binance URLs)
 const TICKER_MAP = {
-  SPY:   { finnhub: 'SPY',             type: 'stock' },
-  QQQ:   { finnhub: 'QQQ',             type: 'stock' },
-  USO:   { finnhub: 'USO',             type: 'stock' },
-  GLD:   { finnhub: 'GLD',             type: 'stock' },
-  SLV:   { finnhub: 'SLV',             type: 'stock' },
-  GDX:   { finnhub: 'GDX',             type: 'stock' },
-  XLE:   { finnhub: 'XLE',             type: 'stock' },
-  BTC:   { finnhub: 'BINANCE:BTCUSDT', type: 'crypto' },
-  ETH:   { finnhub: 'BINANCE:ETHUSDT', type: 'crypto' },
-  SOL:   { finnhub: 'BINANCE:SOLUSDT', type: 'crypto' },
-  VIXY:  { finnhub: 'VIXY',            type: 'stock' },
-  UUP:   { finnhub: 'UUP',             type: 'stock' },
+  SPY:   { td: 'SPY'     },
+  QQQ:   { td: 'QQQ'     },
+  USO:   { td: 'USO'     },
+  GLD:   { td: 'GLD'     },
+  SLV:   { td: 'SLV'     },
+  GDX:   { td: 'GDX'     },
+  XLE:   { td: 'XLE'     },
+  BTC:   { td: 'BTC/USD' },
+  ETH:   { td: 'ETH/USD' },
+  SOL:   { td: 'SOL/USD' },
+  VIXY:  { td: 'VIXY'    },
+  UUP:   { td: 'UUP'     },
 }
 
-async function fetchCandles(symbol, type, apiKey) {
+async function fetchSeries(symbol, apiKey) {
   try {
-    const now = Math.floor(Date.now() / 1000)
-    const from = now - DAYS * 24 * 60 * 60
-    const endpoint = type === 'crypto' ? 'crypto/candle' : 'stock/candle'
-    const url = `${FINNHUB_BASE}/${endpoint}?symbol=${encodeURIComponent(symbol)}&resolution=D&from=${from}&to=${now}&token=${apiKey}`
-
+    const url = `${TD_BASE}/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=${DAYS}&apikey=${apiKey}`
     const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+
     if (!res.ok) return { values: null, error: `HTTP ${res.status}` }
 
     const data = await res.json()
-    if (data.s !== 'ok' || !Array.isArray(data.c) || data.c.length === 0) {
-      return { values: null, error: data.s || 'no data' }
+
+    // Twelve Data returns { status: "error", message: "..." } on problems
+    if (data.status === 'error') {
+      return { values: null, error: data.message || 'API error' }
     }
 
-    return { values: data.c }
+    if (!data.values || !Array.isArray(data.values) || data.values.length === 0) {
+      return { values: null, error: 'no data' }
+    }
+
+    // Twelve Data returns values newest-first. Reverse so sparkline draws
+    // oldest-to-newest (left to right).
+    const closes = data.values
+      .map((row) => parseFloat(row.close))
+      .filter((n) => !isNaN(n))
+      .reverse()
+
+    return { values: closes }
   } catch (err) {
     return { values: null, error: err.message || 'fetch failed' }
   }
 }
 
 export default async function handler(req, res) {
-  const apiKey = process.env.FINNHUB_API_KEY
+  const apiKey = process.env.TWELVEDATA_API_KEY
   if (!apiKey) {
-    return res.status(500).json({ error: 'FINNHUB_API_KEY not set' })
+    return res.status(500).json({ error: 'TWELVEDATA_API_KEY not set in Vercel env vars' })
   }
 
   const symbols = Object.keys(TICKER_MAP)
-  const results = await Promise.all(
-    symbols.map(async (symbol) => {
-      const { finnhub, type } = TICKER_MAP[symbol]
-      const sparkline = await fetchCandles(finnhub, type, apiKey)
-      return [symbol, sparkline]
-    })
-  )
 
-  const sparklines = Object.fromEntries(results)
+  // Twelve Data free tier allows 8 calls/min.
+  // 12 parallel calls could briefly spike above that, so we fire them
+  // as 2 sequential batches of 6 with a small gap. Edge cache of 10 min
+  // means this rate is hit at most once per 10 minutes regardless of
+  // how many visitors hit the site.
+  const batchSize = 6
+  const allResults = []
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const batch = symbols.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batch.map(async (symbol) => {
+        const { td } = TICKER_MAP[symbol]
+        const series = await fetchSeries(td, apiKey)
+        return [symbol, series]
+      })
+    )
+    allResults.push(...batchResults)
+    // Small gap between batches if there's another round coming
+    if (i + batchSize < symbols.length) {
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+  }
 
-  // Longer cache -- sparklines show daily trend, don't need live updates
+  const sparklines = Object.fromEntries(allResults)
+
   res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200')
   res.status(200).json({
     sparklines,

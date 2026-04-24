@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  
+  <circle cx="100" cy="100" r="94" fill="none" stroke="#d4a256" stroke-width="2"/>
+  <line x1="100" y1="10" x2="100" y2="18" stroke="#d4a256" stroke-width="1.5"/>
+  <line x1="10" y1="100" x2="18" y2="100" stroke="#d4a256" stroke-width="1.5"/>
+  <line x1="182" y1="100" x2="190" y2="100" stroke="#d4a256" stroke-width="1.5"/>
+  <text x="100" y="108" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-style="italic" font-size="76" fill="#d4a256">2%</text>
+  <defs><path id="est-arc" d="M 45,100 A 55,55 0 0,0 155,100" fill="none"/></defs>
+  <text font-family="JetBrains Mono, monospace" font-size="8" fill="#9a6a3a" letter-spacing="3.5"><textPath href="#est-arc" startOffset="50%" text-anchor="middle">· EST · 2021 ·</textPath></text>
+</svg>

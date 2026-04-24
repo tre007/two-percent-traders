@@ -1,21 +1,18 @@
 // ============================================================
-// /api/content.js -- Fetches watchlist + deep dive from Google Sheets
+// /api/content.js -- Fetches watchlist + deep dive + archive from Google Sheets
 // ============================================================
-// Uses Google's "Publish to web" CSV endpoint, which is more
-// reliable than the gviz/tq endpoint (which has a known bug that
-// sometimes collapses all rows into one row).
+// Uses Google's "Publish to web" CSV endpoint.
 //
-// Required env vars in Vercel:
-//   GOOGLE_PUBLISH_ID    - the "2PACX-..." ID from a published URL
-//   GOOGLE_WATCHLIST_GID - numeric tab ID for the watchlist tab
-//   GOOGLE_DEEPDIVE_GID  - numeric tab ID for the deepdive tab
+// Sheet structure:
+//   Tab "watchlist": symbol, name, thesis, price (optional)
+//   Tab "deepdive":  issue, date, title, summary, discordUrl
+//                    - Row 2 (first data row) = current featured post
+//                    - Rows 3+                = archive of past posts
 //
-// To find these: File > Share > Publish to web > pick the tab >
-// format CSV > look at the URL. The gid parameter is the tab ID.
-//
-// The 'price' column in the watchlist is optional. When filled in,
-// the site uses that value instead of the live API for that row.
-// Useful for tickers the live API doesn't support (spot gold, etc).
+// Workflow for weekly update:
+//   1. Right-click row 2, "Insert 1 row above"
+//   2. Type this week's Deep Dive in the fresh row 2
+//   3. Done. The old post automatically becomes archive.
 // ============================================================
 
 const PUBLISH_ID = process.env.GOOGLE_PUBLISH_ID
@@ -26,7 +23,6 @@ function publishedCsvUrl(gid) {
   return `https://docs.google.com/spreadsheets/d/e/${PUBLISH_ID}/pub?gid=${gid}&single=true&output=csv`
 }
 
-// RFC-ish CSV parser - handles quoted fields with commas and escaped quotes
 function parseCSV(text) {
   const rows = []
   let row = []
@@ -92,6 +88,16 @@ async function fetchPublishedCsv(gid) {
   return csvToObjects(parseCSV(text))
 }
 
+function normalizeDeepDive(row) {
+  return {
+    issue: parseInt(row.issue || '0', 10) || 0,
+    date: row.date || '',
+    title: row.title || '',
+    summary: row.summary || '',
+    discordUrl: row.discordurl || row.discord_url || '#',
+  }
+}
+
 export default async function handler(req, res) {
   if (!PUBLISH_ID || !WATCHLIST_GID || !DEEPDIVE_GID) {
     return res.status(500).json({
@@ -105,7 +111,7 @@ export default async function handler(req, res) {
       fetchPublishedCsv(DEEPDIVE_GID),
     ])
 
-    // Parse optional price column. Strip $, commas, whitespace.
+    // Watchlist
     const watchlist = watchlistRows.map((r) => {
       const priceStr = (r.price || '').replace(/[$,\s]/g, '')
       const priceNum = priceStr.length > 0 ? parseFloat(priceStr) : null
@@ -117,19 +123,16 @@ export default async function handler(req, res) {
       }
     })
 
-    const first = deepdiveRows[0] || {}
-    const deepDive = {
-      issue: parseInt(first.issue || '0', 10) || 0,
-      date: first.date || '',
-      title: first.title || '',
-      summary: first.summary || '',
-      discordUrl: first.discordurl || first.discord_url || '#',
-    }
+    // Deep dive: first row = featured, rest = archive
+    const allDeepDives = deepdiveRows.map(normalizeDeepDive)
+    const deepDive = allDeepDives[0] || { issue: 0, date: '', title: '', summary: '', discordUrl: '#' }
+    const archive = allDeepDives.slice(1) // everything after the featured one
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600')
     res.status(200).json({
       watchlist,
       deepDive,
+      archive,
       fetchedAt: new Date().toISOString(),
     })
   } catch (err) {

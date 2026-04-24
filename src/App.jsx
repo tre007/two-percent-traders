@@ -3,11 +3,8 @@ import { scoreboard as scoreboardStatic, watchlist as watchlistStatic, deepDive 
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
 
-// ============================================================
-// HELPERS
-// ============================================================
 function formatPrice(price) {
-  if (price == null) return '—'
+  if (price == null) return '--'
   if (price >= 10000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 })
   return price.toFixed(2)
 }
@@ -36,7 +33,7 @@ function isMarketOpen(d) {
   const minute = parseInt(parts.find((p) => p.type === 'minute').value)
   if (weekday === 'Sat' || weekday === 'Sun') return false
   const minutes = hour * 60 + minute
-  return minutes >= 510 && minutes < 900 // 8:30 AM - 3:00 PM CT
+  return minutes >= 510 && minutes < 900
 }
 
 function mergePrices(staticList, livePrices) {
@@ -49,15 +46,13 @@ function mergePrices(staticList, livePrices) {
   })
 }
 
-// ============================================================
-// COMPONENTS
-// ============================================================
 function Change({ change }) {
-  if (change == null) return <span className="text-xs font-mono text-neutral-600">—</span>
+  if (change == null) return <span className="text-xs font-mono text-neutral-600">--</span>
   const positive = change >= 0
+  const arrow = positive ? '\u25B2' : '\u25BC'
   return (
     <span className={`text-xs font-mono font-medium ${positive ? 'text-emerald-400' : 'text-rose-400'}`}>
-      {positive ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
+      {arrow} {Math.abs(change).toFixed(2)}%
     </span>
   )
 }
@@ -161,10 +156,10 @@ function LiveStatus({ loading, error, lastUpdated, isStale }) {
     text = 'API ERROR // SHOWING FALLBACK VALUES FROM data.js'
     color = 'text-rose-400'
   } else if (isStale) {
-    text = `LAST UPDATE ${formatTime(lastUpdated)} CT // CONNECTION STALE`
+    text = 'LAST UPDATE ' + formatTime(lastUpdated) + ' CT // CONNECTION STALE'
     color = 'text-amber-400'
   } else if (lastUpdated) {
-    text = `LIVE // UPDATED ${formatTime(lastUpdated)} CT // AUTO-REFRESH 30S`
+    text = 'LIVE // UPDATED ' + formatTime(lastUpdated) + ' CT // AUTO-REFRESH 30S'
     color = 'text-neutral-500'
   } else {
     text = 'LOADING'
@@ -197,7 +192,7 @@ function DeepDive({ deepDive }) {
         className="font-mono inline-flex items-center gap-2 text-brand-amber hover:text-brand-amber/80 text-xs md:text-sm tracking-[0.2em] uppercase transition-colors group"
       >
         Read full post on Discord
-        <span className="transition-transform group-hover:translate-x-1">→</span>
+        <span className="transition-transform group-hover:translate-x-1">&gt;</span>
       </a>
     </article>
   )
@@ -224,7 +219,7 @@ function Footer() {
               rel="noopener noreferrer"
               className="font-mono inline-flex items-center gap-2 px-5 py-2.5 border border-brand-amber/60 text-brand-amber hover:bg-brand-amber/10 hover:border-brand-amber transition-all text-xs md:text-sm tracking-[0.15em] uppercase"
             >
-              Join the Discord →
+              Join the Discord &gt;
             </a>
             <p className="font-mono text-[10px] text-neutral-600 tracking-[0.15em] uppercase max-w-xs text-left md:text-right">
               Not financial advice. For entertainment only. Stay frosty.
@@ -236,9 +231,6 @@ function Footer() {
   )
 }
 
-// ============================================================
-// MAIN APP
-// ============================================================
 export default function App() {
   const [now, setNow] = useState(new Date())
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
@@ -257,7 +249,6 @@ export default function App() {
       <Header now={now} />
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
-        {/* The Scoreboard */}
         <section className="mb-14 md:mb-20">
           <SectionLabel>The Scoreboard // Live</SectionLabel>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
@@ -268,7 +259,6 @@ export default function App() {
           <LiveStatus loading={loading} error={error} lastUpdated={lastUpdated} isStale={isStale} />
         </section>
 
-        {/* The Watchlist */}
         <section className="mb-14 md:mb-20">
           <SectionLabel>The Watchlist // What We're Tracking</SectionLabel>
           <div className="border-t border-white/5">
@@ -278,7 +268,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* Deep Dive */}
         <section>
           <SectionLabel>This Week</SectionLabel>
           <DeepDive deepDive={deepDive} />

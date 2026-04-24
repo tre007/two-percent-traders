@@ -2,24 +2,22 @@
 // /api/sparklines.js -- Serverless function on Vercel
 // ============================================================
 // Uses Twelve Data's time_series endpoint to fetch 7 days of
-// daily closing prices for each ticker. Used to draw sparklines
-// in the scoreboard cards.
+// daily closing prices for each ticker, used to draw sparklines.
 //
-// Why Twelve Data instead of Finnhub:
-//   Finnhub moved /stock/candle to paid tier in 2025.
-//   Twelve Data's free tier (800 calls/day) supports daily
-//   bars for stocks, ETFs, and crypto on one endpoint.
+// Rate limit note: Twelve Data free tier = 8 calls/minute.
+// We have 12 tickers. Strategy: fetch 4 at a time, wait 8 sec,
+// fetch the next 4, wait 8 sec, fetch final 4. That's 12 calls
+// spread across ~16 seconds = well under 8/min.
 //
 // Edge-cached for 10 minutes since daily bars don't change
-// intraday meaningfully.
+// meaningfully intraday. This means the function itself only
+// runs a few times per hour regardless of how much traffic
+// the site gets.
 // ============================================================
 
 const TD_BASE = 'https://api.twelvedata.com'
 const DAYS = 7
 
-// Twelve Data uses different symbol formats than Finnhub.
-// Stocks/ETFs: plain ticker (e.g. "SPY")
-// Crypto: "BTC/USD" format (not Binance URLs)
 const TICKER_MAP = {
   SPY:   { td: 'SPY'     },
   QQQ:   { td: 'QQQ'     },
@@ -44,7 +42,6 @@ async function fetchSeries(symbol, apiKey) {
 
     const data = await res.json()
 
-    // Twelve Data returns { status: "error", message: "..." } on problems
     if (data.status === 'error') {
       return { values: null, error: data.message || 'API error' }
     }
@@ -53,8 +50,7 @@ async function fetchSeries(symbol, apiKey) {
       return { values: null, error: 'no data' }
     }
 
-    // Twelve Data returns values newest-first. Reverse so sparkline draws
-    // oldest-to-newest (left to right).
+    // Twelve Data returns newest-first, flip for left-to-right drawing
     const closes = data.values
       .map((row) => parseFloat(row.close))
       .filter((n) => !isNaN(n))
@@ -73,16 +69,12 @@ export default async function handler(req, res) {
   }
 
   const symbols = Object.keys(TICKER_MAP)
-
-  // Twelve Data free tier allows 8 calls/min.
-  // 12 parallel calls could briefly spike above that, so we fire them
-  // as 2 sequential batches of 6 with a small gap. Edge cache of 10 min
-  // means this rate is hit at most once per 10 minutes regardless of
-  // how many visitors hit the site.
-  const batchSize = 6
+  const BATCH_SIZE = 4
+  const GAP_MS = 8000 // 8 seconds between batches
   const allResults = []
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize)
+
+  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+    const batch = symbols.slice(i, i + BATCH_SIZE)
     const batchResults = await Promise.all(
       batch.map(async (symbol) => {
         const { td } = TICKER_MAP[symbol]
@@ -91,14 +83,16 @@ export default async function handler(req, res) {
       })
     )
     allResults.push(...batchResults)
-    // Small gap between batches if there's another round coming
-    if (i + batchSize < symbols.length) {
-      await new Promise((r) => setTimeout(r, 1000))
+
+    // Gap between batches, but not after the last one
+    if (i + BATCH_SIZE < symbols.length) {
+      await new Promise((r) => setTimeout(r, GAP_MS))
     }
   }
 
   const sparklines = Object.fromEntries(allResults)
 
+  // 10 min edge cache. This function runs at most ~6 times per hour.
   res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200')
   res.status(200).json({
     sparklines,

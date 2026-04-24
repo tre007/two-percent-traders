@@ -56,29 +56,35 @@ async function fetchQuote(symbol, type, apiKey) {
 // The tickers we fetch. This list mirrors what's in src/data.js
 // but maps each to the right Finnhub symbol + type.
 const TICKER_MAP = {
-  // Scoreboard
-  'S&P 500':  { finnhub: 'SPY',            type: 'stock'  }, // SPY tracks S&P 500
-  'DOW':      { finnhub: 'DIA',            type: 'stock'  }, // DIA tracks Dow
-  'BRENT':    { finnhub: 'USO',            type: 'stock'  }, // USO = oil proxy
-  'GOLD':     { finnhub: 'OANDA:XAU_USD',  type: 'forex'  }, // Spot gold via OANDA
-  'SILVER':   { finnhub: 'OANDA:XAG_USD',  type: 'forex'  }, // Spot silver via OANDA
-  'GDX':      { finnhub: 'GDX',            type: 'stock'  },
-  'XLE':      { finnhub: 'XLE',            type: 'stock'  },
-  'BTC':      { finnhub: 'BINANCE:BTCUSDT',type: 'crypto' },
-  'ETH':      { finnhub: 'BINANCE:ETHUSDT',type: 'crypto' },
-  'SOL':      { finnhub: 'BINANCE:SOLUSDT',type: 'crypto' },
-  'VIX':      { finnhub: 'VIXY',           type: 'stock'  }, // VIXY tracks VIX
-  'DXY':      { finnhub: 'UUP',            type: 'stock'  }, // UUP tracks DXY
+  // Scoreboard - all real ETF tickers, all reliable on Finnhub free tier
+  'SPY':      { finnhub: 'SPY',             type: 'stock'  }, // S&P 500 ETF
+  'QQQ':      { finnhub: 'QQQ',             type: 'stock'  }, // Nasdaq-100 ETF
+  'USO':      { finnhub: 'USO',             type: 'stock'  }, // Oil ETF
+  'GLD':      { finnhub: 'GLD',             type: 'stock'  }, // Gold ETF
+  'SLV':      { finnhub: 'SLV',             type: 'stock'  }, // Silver ETF
+  'GDX':      { finnhub: 'GDX',             type: 'stock'  }, // Gold Miners ETF
+  'XLE':      { finnhub: 'XLE',             type: 'stock'  }, // Energy ETF
+  'BTC':      { finnhub: 'BINANCE:BTCUSDT', type: 'crypto' },
+  'ETH':      { finnhub: 'BINANCE:ETHUSDT', type: 'crypto' },
+  'SOL':      { finnhub: 'BINANCE:SOLUSDT', type: 'crypto' },
+  'VIXY':     { finnhub: 'VIXY',            type: 'stock'  }, // Volatility ETF
+  'UUP':      { finnhub: 'UUP',             type: 'stock'  }, // Dollar Bullish ETF
 
   // Watchlist-only tickers (not in scoreboard)
-  'WPM':      { finnhub: 'WPM',  type: 'stock' },
-  'VXUS':     { finnhub: 'VXUS', type: 'stock' },
-  'PDBC':     { finnhub: 'PDBC', type: 'stock' },
-  'URA':      { finnhub: 'URA',  type: 'stock' },
-  'COPX':     { finnhub: 'COPX', type: 'stock' },
-  'IRM':      { finnhub: 'IRM',  type: 'stock' },
-  'VUG':      { finnhub: 'VUG',  type: 'stock' },
-  'META':     { finnhub: 'META', type: 'stock' },
+  'WPM':      { finnhub: 'WPM',   type: 'stock' },
+  'VXUS':     { finnhub: 'VXUS',  type: 'stock' },
+  'PDBC':     { finnhub: 'PDBC',  type: 'stock' },
+  'URA':      { finnhub: 'URA',   type: 'stock' },
+  'COPX':     { finnhub: 'COPX',  type: 'stock' },
+  'IRM':      { finnhub: 'IRM',   type: 'stock' },
+  'VUG':      { finnhub: 'VUG',   type: 'stock' },
+  'META':     { finnhub: 'META',  type: 'stock' },
+
+  // Watchlist tickers that were using OANDA (unreliable) - map to their ETF proxy
+  // Your watchlist in data.js still uses 'GOLD' and 'SILVER' as labels, but the
+  // price API will return GLD/SLV ETF prices under those keys.
+  'GOLD':     { finnhub: 'GLD',   type: 'stock' },  // Gold ETF as proxy
+  'SILVER':   { finnhub: 'SLV',   type: 'stock' },  // Silver ETF as proxy
 }
 
 export default async function handler(req, res) {

@@ -37,9 +37,6 @@ function isMarketOpen(d) {
   return minutes >= 510 && minutes < 900
 }
 
-// Merge static list + live API prices.
-// If item has a manualPrice from the sheet, that wins.
-// Otherwise use the live API value.
 function mergePrices(staticList, livePrices) {
   return staticList.map((item) => {
     if (item.manualPrice != null) {
@@ -90,7 +87,6 @@ function Sparkline({ values, width = 100, height = 26 }) {
 
 function Change({ change, isManual }) {
   if (isManual) {
-    // Manual prices don't have a computed change - show a small "MANUAL" tag
     return <span className="text-[9px] font-mono tracking-[0.15em] text-neutral-500 uppercase">Manual</span>
   }
   if (change == null) return <span className="text-xs font-mono text-neutral-600">--</span>
@@ -250,6 +246,44 @@ function DeepDive({ deepDive }) {
   )
 }
 
+function ArchiveList({ archive }) {
+  if (!archive || archive.length === 0) return null
+
+  return (
+    <div className="border-t border-white/5">
+      {archive.map((post) => (
+        <a
+          key={post.issue}
+          href={post.discordUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group block py-4 md:py-5 border-b border-white/5 last:border-b-0 hover:bg-white/[0.015] transition-colors"
+        >
+          <div className="flex items-baseline justify-between gap-4 flex-wrap md:flex-nowrap">
+            <div className="flex items-baseline gap-3 min-w-0 flex-wrap md:flex-nowrap">
+              <span className="font-mono text-[10px] tracking-[0.18em] text-brand-amber/70 shrink-0">
+                ISSUE {String(post.issue).padStart(3, '0')}
+              </span>
+              <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 shrink-0 hidden sm:inline">
+                {post.date}
+              </span>
+              <h3 className="font-serif italic text-neutral-200 text-base md:text-lg leading-snug truncate group-hover:text-brand-amber transition-colors">
+                {post.title}
+              </h3>
+            </div>
+            <span className="font-mono text-[10px] text-neutral-600 group-hover:text-brand-amber/80 transition-colors shrink-0 hidden md:inline">
+              READ &gt;
+            </span>
+          </div>
+          <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 sm:hidden block mt-1">
+            {post.date}
+          </span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
 function Footer() {
   return (
     <footer className="border-t border-white/5 mt-16 md:mt-20">
@@ -286,7 +320,7 @@ function Footer() {
 export default function App() {
   const [now, setNow] = useState(new Date())
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
-  const { watchlist: watchlistContent, deepDive } = useLiveContent(watchlistStatic, deepDiveStatic)
+  const { watchlist: watchlistContent, deepDive, archive } = useLiveContent(watchlistStatic, deepDiveStatic)
   const { sparklines } = useSparklines()
 
   useEffect(() => {
@@ -325,10 +359,17 @@ export default function App() {
           </div>
         </section>
 
-        <section>
+        <section className="mb-14 md:mb-20">
           <SectionLabel>This Week</SectionLabel>
           <DeepDive deepDive={deepDive} />
         </section>
+
+        {archive && archive.length > 0 && (
+          <section>
+            <SectionLabel>The Archive // Past Deep Dives</SectionLabel>
+            <ArchiveList archive={archive} />
+          </section>
+        )}
       </main>
 
       <Footer />

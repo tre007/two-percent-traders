@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { scoreboard as scoreboardStatic, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
+import { useSparklines } from './useSparklines'
 
 function formatPrice(price) {
   if (price == null) return '--'
@@ -46,6 +47,49 @@ function mergePrices(staticList, livePrices) {
   })
 }
 
+// ============================================================
+// SPARKLINE
+// Tiny inline SVG line chart. Draws a polyline across the
+// available width, scaled to the min/max of the values.
+// Colored green if last > first, red otherwise.
+// ============================================================
+function Sparkline({ values, width = 100, height = 26 }) {
+  if (!values || !Array.isArray(values) || values.length < 2) {
+    // No data - render empty space to keep card heights consistent
+    return <div style={{ width, height }} />
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1 // guard against flat line
+
+  // Map each value to an (x, y) coordinate
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width
+      const y = height - ((v - min) / range) * height
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+
+  const positive = values[values.length - 1] >= values[0]
+  const stroke = positive ? '#34d399' : '#fb7185' // emerald-400 / rose-400
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      <polyline
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+        opacity="0.85"
+      />
+    </svg>
+  )
+}
+
 function Change({ change }) {
   if (change == null) return <span className="text-xs font-mono text-neutral-600">--</span>
   const positive = change >= 0
@@ -69,7 +113,7 @@ function SectionLabel({ children }) {
   )
 }
 
-function ScoreboardCard({ item }) {
+function ScoreboardCard({ item, sparkline }) {
   return (
     <div
       className="group border border-brand-amber/15 hover:border-brand-amber/50 transition-all duration-200 p-4"
@@ -83,9 +127,10 @@ function ScoreboardCard({ item }) {
         </span>
         <Change change={item.change} />
       </div>
-      <div className="font-mono text-xl md:text-2xl text-neutral-100 font-medium">
+      <div className="font-mono text-xl md:text-2xl text-neutral-100 font-medium mb-2">
         {formatPrice(item.price)}
       </div>
+      <Sparkline values={sparkline} width={120} height={24} />
     </div>
   )
 }
@@ -164,7 +209,7 @@ function LiveStatus({ loading, error, lastUpdated, isStale }) {
     text = 'LAST UPDATE ' + formatTime(lastUpdated) + ' CT // CONNECTION STALE'
     color = 'text-amber-400'
   } else if (lastUpdated) {
-    text = 'LIVE // UPDATED ' + formatTime(lastUpdated) + ' CT // AUTO-REFRESH 30S'
+    text = 'LIVE // UPDATED ' + formatTime(lastUpdated) + ' CT // AUTO-REFRESH 30S // 7D TREND'
     color = 'text-neutral-500'
   } else {
     text = 'LOADING'
@@ -240,6 +285,7 @@ export default function App() {
   const [now, setNow] = useState(new Date())
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
   const { watchlist: watchlistContent, deepDive } = useLiveContent(watchlistStatic, deepDiveStatic)
+  const { sparklines } = useSparklines()
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
@@ -258,7 +304,11 @@ export default function App() {
           <SectionLabel>The Scoreboard // Live</SectionLabel>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
             {scoreboard.map((item) => (
-              <ScoreboardCard key={item.symbol} item={item} />
+              <ScoreboardCard
+                key={item.symbol}
+                item={item}
+                sparkline={sparklines[item.symbol]?.values}
+              />
             ))}
           </div>
           <LiveStatus loading={loading} error={error} lastUpdated={lastUpdated} isStale={isStale} />

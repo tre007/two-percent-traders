@@ -246,39 +246,65 @@ function DeepDive({ deepDive }) {
   )
 }
 
+// Individual archive row - manages its own expanded state
+function ArchiveRow({ post }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="border-b border-white/5 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left py-4 md:py-5 hover:bg-white/[0.015] transition-colors px-0"
+      >
+        <div className="flex items-baseline justify-between gap-4 flex-wrap md:flex-nowrap">
+          <div className="flex items-baseline gap-3 min-w-0 flex-wrap md:flex-nowrap">
+            <span className="font-mono text-[10px] tracking-[0.18em] text-brand-amber/70 shrink-0">
+              ISSUE {String(post.issue).padStart(3, '0')}
+            </span>
+            <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 shrink-0 hidden sm:inline">
+              {post.date}
+            </span>
+            <h3 className="font-serif italic text-neutral-200 text-base md:text-lg leading-snug">
+              {post.title}
+            </h3>
+          </div>
+          <span className={`font-mono text-[10px] text-neutral-500 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}>
+            &#9662;
+          </span>
+        </div>
+        <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 sm:hidden block mt-1">
+          {post.date}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="pb-5 md:pb-6 pt-1">
+          <p className="text-sm text-neutral-400 leading-relaxed max-w-2xl mb-4">
+            {post.summary}
+          </p>
+          <a
+            href={post.discordUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono inline-flex items-center gap-2 text-brand-amber hover:text-brand-amber/80 text-[11px] md:text-xs tracking-[0.2em] uppercase transition-colors group"
+          >
+            Read full post on Discord
+            <span className="transition-transform group-hover:translate-x-1">&gt;</span>
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ArchiveList({ archive }) {
   if (!archive || archive.length === 0) return null
 
   return (
     <div className="border-t border-white/5">
       {archive.map((post) => (
-        <a
-          key={post.issue}
-          href={post.discordUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group block py-4 md:py-5 border-b border-white/5 last:border-b-0 hover:bg-white/[0.015] transition-colors"
-        >
-          <div className="flex items-baseline justify-between gap-4 flex-wrap md:flex-nowrap">
-            <div className="flex items-baseline gap-3 min-w-0 flex-wrap md:flex-nowrap">
-              <span className="font-mono text-[10px] tracking-[0.18em] text-brand-amber/70 shrink-0">
-                ISSUE {String(post.issue).padStart(3, '0')}
-              </span>
-              <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 shrink-0 hidden sm:inline">
-                {post.date}
-              </span>
-              <h3 className="font-serif italic text-neutral-200 text-base md:text-lg leading-snug truncate group-hover:text-brand-amber transition-colors">
-                {post.title}
-              </h3>
-            </div>
-            <span className="font-mono text-[10px] text-neutral-600 group-hover:text-brand-amber/80 transition-colors shrink-0 hidden md:inline">
-              READ &gt;
-            </span>
-          </div>
-          <span className="font-mono text-[10px] tracking-[0.1em] text-neutral-600 sm:hidden block mt-1">
-            {post.date}
-          </span>
-        </a>
+        <ArchiveRow key={post.issue} post={post} />
       ))}
     </div>
   )

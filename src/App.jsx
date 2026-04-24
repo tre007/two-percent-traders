@@ -122,7 +122,7 @@ function Header({ now }) {
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-5">
         <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
           <div className="flex items-center gap-3">
-            <img src="/logo-icon.svg" alt="2% Traders" className="w-16 h-16 md:w-20 md:h-20" />
+            <img src="/logo-icon-header.svg" alt="2% Traders" className="w-16 h-16 md:w-20 md:h-20" />
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="font-serif italic text-brand-amber text-2xl md:text-[1.65rem] leading-none">2%</span>

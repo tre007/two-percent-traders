@@ -20,10 +20,8 @@
 // ------------------------------------------------------------
 // 1. THE SCOREBOARD
 // ------------------------------------------------------------
-// 12 tickers shown as cards at the top of the page.
-// Prices are currently MOCK data - real prices wire up in Stage 3.
-// For now: change a ticker by editing the `symbol` text.
-// The `price` and `change` fields are placeholders until live API.
+// Prices come from the live API. The `price: null` values here
+// are fallbacks - used only if Finnhub fails.
 // ------------------------------------------------------------
 export const scoreboard = [
   { symbol: 'SPY',   price: null, change: null },  // S&P 500 ETF
@@ -44,8 +42,7 @@ export const scoreboard = [
 // ------------------------------------------------------------
 // 2. THE WATCHLIST
 // ------------------------------------------------------------
-// 15 tickers with your thesis. This is the unique value of the site.
-// Edit the `thesis` field to update your take on each ticker.
+// 15 tickers with your thesis. Edit the `thesis` field to update.
 // Keep each thesis to 1-2 sentences for visual consistency.
 // ------------------------------------------------------------
 export const watchlist = [
@@ -162,14 +159,13 @@ export const watchlist = [
 // ------------------------------------------------------------
 // Featured weekly post. Update each Wednesday after posting.
 // `discordUrl` is where "Read full post on Discord" links to.
-// Use the URL to the actual Discord message for deep linking.
 // ------------------------------------------------------------
 export const deepDive = {
   issue: 14,
   date: 'APRIL 23, 2026',
   title: 'Gold miners or physical gold?',
   summary: 'GDX gives you 2-3x leverage to the gold price with zero storage hassle. Physical gold gives you zero counterparty risk and lives outside the financial system. The real answer is not one or the other. Here is how I am sizing each.',
-  discordUrl: 'https://discord.com/channels/YOUR_SERVER_ID/YOUR_CHANNEL_ID',
+  discordUrl: 'https://discord.gg/zEAqUXA2wJ',
 }
 
 
@@ -177,7 +173,5 @@ export const deepDive = {
 // 4. DISCORD INVITE URL
 // ------------------------------------------------------------
 // The "Join the Discord" button in the footer links here.
-// Replace with your actual invite URL.
-// Generate one in Discord: right-click server → Invite People.
 // ------------------------------------------------------------
-export const discordInviteUrl = 'https://discord.gg/YOUR_INVITE_CODE'
+export const discordInviteUrl = 'https://discord.gg/zEAqUXA2wJ'

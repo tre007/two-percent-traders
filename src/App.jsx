@@ -71,9 +71,14 @@ function SectionLabel({ children }) {
 
 function ScoreboardCard({ item }) {
   return (
-    <div className="group border border-white/5 hover:border-brand-amber/40 transition-all duration-200 bg-black/30 hover:bg-black/50 p-4">
+    <div
+      className="group border border-brand-amber/15 hover:border-brand-amber/50 transition-all duration-200 p-4"
+      style={{
+        background: 'linear-gradient(135deg, rgba(212, 162, 86, 0.06) 0%, rgba(212, 162, 86, 0.02) 100%)',
+      }}
+    >
       <div className="flex items-baseline justify-between mb-3">
-        <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-neutral-500">
+        <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-neutral-400">
           {item.symbol}
         </span>
         <Change change={item.change} />
@@ -117,7 +122,7 @@ function Header({ now }) {
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-5">
         <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
           <div className="flex items-center gap-3">
-            <img src="/logo-icon.svg" alt="2% Traders" className="w-10 h-10 md:w-12 md:h-12" />
+            <img src="/logo-icon.svg" alt="2% Traders" className="w-16 h-16 md:w-20 md:h-20" />
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="font-serif italic text-brand-amber text-2xl md:text-[1.65rem] leading-none">2%</span>

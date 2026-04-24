@@ -190,7 +190,7 @@ function DeepDive({ deepDive }) {
       <p className="text-neutral-300 leading-relaxed max-w-2xl mb-8 text-base">
         {deepDive.summary}
       </p>
-      
+      <a
         href={deepDive.discordUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -218,7 +218,7 @@ function Footer() {
             </p>
           </div>
           <div className="flex flex-col gap-3 items-start md:items-end">
-            
+            <a
               href={discordInviteUrl}
               target="_blank"
               rel="noopener noreferrer"

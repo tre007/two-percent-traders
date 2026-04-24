@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react'
 
 // ============================================================
-// useLiveContent — React hook for watchlist + deepDive from Sheets
+// useLiveContent -- React hook for watchlist + deepDive + archive
 // ============================================================
-// Calls /api/content on mount. Falls back to data.js values if fetch fails
-// or if GOOGLE_SHEET_ID isn't configured yet.
+// Calls /api/content on mount. Returns Sheet data when available,
+// falls back to values from data.js if the fetch fails.
 //
 // Usage:
-//   const { watchlist, deepDive, loading, error } = useLiveContent(fallbackWatchlist, fallbackDeepDive)
+//   const { watchlist, deepDive, archive } = useLiveContent(
+//     fallbackWatchlist, fallbackDeepDive
+//   )
 // ============================================================
 
 export function useLiveContent(fallbackWatchlist, fallbackDeepDive) {
   const [watchlist, setWatchlist] = useState(fallbackWatchlist)
   const [deepDive, setDeepDive] = useState(fallbackDeepDive)
+  const [archive, setArchive] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [fromSheet, setFromSheet] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -29,22 +31,22 @@ export function useLiveContent(fallbackWatchlist, fallbackDeepDive) {
         if (cancelled) return
 
         if (data.error) {
-          // API responded but something's misconfigured — keep fallback
           setError(data.error)
           return
         }
 
-        // Watchlist: only replace if Sheet has entries
         if (Array.isArray(data.watchlist) && data.watchlist.length > 0) {
           setWatchlist(data.watchlist)
         }
 
-        // Deep dive: only replace if Sheet has a title filled in
         if (data.deepDive && data.deepDive.title) {
           setDeepDive(data.deepDive)
         }
 
-        setFromSheet(true)
+        if (Array.isArray(data.archive)) {
+          setArchive(data.archive)
+        }
+
         setError(null)
       } catch (err) {
         if (!cancelled) setError(err.message || 'Fetch failed')
@@ -57,5 +59,5 @@ export function useLiveContent(fallbackWatchlist, fallbackDeepDive) {
     return () => { cancelled = true }
   }, [])
 
-  return { watchlist, deepDive, loading, error, fromSheet }
+  return { watchlist, deepDive, archive, loading, error }
 }

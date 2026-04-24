@@ -39,8 +39,6 @@ function isMarketOpen(d) {
   return minutes >= 510 && minutes < 900 // 8:30 AM - 3:00 PM CT
 }
 
-// Merge live prices with static watchlist/scoreboard content.
-// If live price exists for a ticker, use it. Otherwise fall back to value from data.js.
 function mergePrices(staticList, livePrices) {
   return staticList.map((item) => {
     const live = livePrices[item.symbol]
@@ -192,7 +190,7 @@ function DeepDive({ deepDive }) {
       <p className="text-neutral-300 leading-relaxed max-w-2xl mb-8 text-base">
         {deepDive.summary}
       </p>
-      <a
+      
         href={deepDive.discordUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -220,7 +218,7 @@ function Footer() {
             </p>
           </div>
           <div className="flex flex-col gap-3 items-start md:items-end">
-            <a
+            
               href={discordInviteUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -244,8 +242,6 @@ function Footer() {
 export default function App() {
   const [now, setNow] = useState(new Date())
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
-
-  // Fetch watchlist + deepDive from Google Sheets (falls back to data.js values)
   const { watchlist: watchlistContent, deepDive } = useLiveContent(watchlistStatic, deepDiveStatic)
 
   useEffect(() => {
@@ -253,18 +249,11 @@ export default function App() {
     return () => clearInterval(interval)
   }, [])
 
-  // Merge live prices into both lists
   const scoreboard = mergePrices(scoreboardStatic, prices)
   const watchlist = mergePrices(watchlistContent, prices)
 
   return (
-    <div
-      className="min-h-screen bg-brand-dark text-neutral-200"
-      style={{
-        backgroundImage:
-          'radial-gradient(circle at 15% 0%, rgba(184, 115, 51, 0.06), transparent 50%), radial-gradient(circle at 85% 100%, rgba(184, 115, 51, 0.04), transparent 50%)',
-      }}
-    >
+    <div className="min-h-screen bg-black text-neutral-200">
       <Header now={now} />
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">

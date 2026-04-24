@@ -1,26 +1,32 @@
 // ============================================================
 // /api/content.js -- Fetches watchlist + deep dive from Google Sheets
 // ============================================================
-// Sheet structure:
-//   Tab "watchlist": columns = symbol, name, thesis, price (optional)
-//   Tab "deepdive":  columns = issue, date, title, summary, discordUrl
+// Uses Google's "Publish to web" CSV endpoint, which is more
+// reliable than the gviz/tq endpoint (which has a known bug that
+// sometimes collapses all rows into one row).
 //
-// The 'price' column is optional. When filled in, the site uses that
-// value and skips the live API for that row. When blank, the live API
-// provides the price automatically.
+// Required env vars in Vercel:
+//   GOOGLE_PUBLISH_ID    - the "2PACX-..." ID from a published URL
+//   GOOGLE_WATCHLIST_GID - numeric tab ID for the watchlist tab
+//   GOOGLE_DEEPDIVE_GID  - numeric tab ID for the deepdive tab
 //
-// Use cases:
-//   - Custom rows (e.g. "Test", "My portfolio value")
-//   - Tickers the live API doesn't support (spot gold, physical silver)
-//   - Entry/target price reference points
+// To find these: File > Share > Publish to web > pick the tab >
+// format CSV > look at the URL. The gid parameter is the tab ID.
+//
+// The 'price' column in the watchlist is optional. When filled in,
+// the site uses that value instead of the live API for that row.
+// Useful for tickers the live API doesn't support (spot gold, etc).
 // ============================================================
 
-const SHEET_ID = process.env.GOOGLE_SHEET_ID
+const PUBLISH_ID = process.env.GOOGLE_PUBLISH_ID
+const WATCHLIST_GID = process.env.GOOGLE_WATCHLIST_GID
+const DEEPDIVE_GID = process.env.GOOGLE_DEEPDIVE_GID
 
-function sheetUrl(sheetName) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`
+function publishedCsvUrl(gid) {
+  return `https://docs.google.com/spreadsheets/d/e/${PUBLISH_ID}/pub?gid=${gid}&single=true&output=csv`
 }
 
+// RFC-ish CSV parser - handles quoted fields with commas and escaped quotes
 function parseCSV(text) {
   const rows = []
   let row = []
@@ -75,31 +81,31 @@ function csvToObjects(rows) {
       obj[key] = (row[i] || '').trim()
     })
     return obj
-  }).filter((obj) => Object.values(obj).some((v) => v.length > 0))
+  }).filter((obj) => Object.values(obj).some((v) => v && v.length > 0))
 }
 
-async function fetchSheet(sheetName) {
-  const res = await fetch(sheetUrl(sheetName), { signal: AbortSignal.timeout(8000) })
-  if (!res.ok) throw new Error(`Sheet "${sheetName}" returned ${res.status}`)
+async function fetchPublishedCsv(gid) {
+  const url = publishedCsvUrl(gid)
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) })
+  if (!res.ok) throw new Error(`gid=${gid} returned ${res.status}`)
   const text = await res.text()
   return csvToObjects(parseCSV(text))
 }
 
 export default async function handler(req, res) {
-  if (!SHEET_ID) {
+  if (!PUBLISH_ID || !WATCHLIST_GID || !DEEPDIVE_GID) {
     return res.status(500).json({
-      error: 'GOOGLE_SHEET_ID not set. Add it in Vercel env vars.',
+      error: 'Missing env vars. Need GOOGLE_PUBLISH_ID, GOOGLE_WATCHLIST_GID, GOOGLE_DEEPDIVE_GID.',
     })
   }
 
   try {
     const [watchlistRows, deepdiveRows] = await Promise.all([
-      fetchSheet('watchlist'),
-      fetchSheet('deepdive'),
+      fetchPublishedCsv(WATCHLIST_GID),
+      fetchPublishedCsv(DEEPDIVE_GID),
     ])
 
-    // Parse optional price column. Strips dollar signs and commas
-    // so people can type "$4,726" or "4726" or "4,726.50" and it works.
+    // Parse optional price column. Strip $, commas, whitespace.
     const watchlist = watchlistRows.map((r) => {
       const priceStr = (r.price || '').replace(/[$,\s]/g, '')
       const priceNum = priceStr.length > 0 ? parseFloat(priceStr) : null

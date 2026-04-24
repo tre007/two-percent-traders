@@ -1,65 +1,64 @@
 // ============================================================
 // /api/sparklines.js -- Serverless function on Vercel
 // ============================================================
-// Uses Twelve Data's time_series endpoint to fetch 7 days of
-// daily closing prices for each ticker, used to draw sparklines.
+// Fetches 7-day daily closing prices from Twelve Data for the
+// 8 most important scoreboard tickers. Each symbol costs 1
+// credit, and Twelve Data free tier caps at 8 credits/minute,
+// so we fetch exactly 8 tickers in a single batched request.
 //
-// Rate limit note: Twelve Data free tier = 8 calls/minute.
-// We have 12 tickers. Strategy: fetch 4 at a time, wait 8 sec,
-// fetch the next 4, wait 8 sec, fetch final 4. That's 12 calls
-// spread across ~16 seconds = well under 8/min.
+// The 4 other scoreboard tickers (USO, SOL, VIXY, UUP) render
+// without sparklines - card shows symbol and price only. If
+// you want to swap which 8 get sparklines, just edit the list
+// below.
 //
 // Edge-cached for 10 minutes since daily bars don't change
-// meaningfully intraday. This means the function itself only
-// runs a few times per hour regardless of how much traffic
-// the site gets.
+// meaningfully intraday.
 // ============================================================
 
 const TD_BASE = 'https://api.twelvedata.com'
 const DAYS = 7
 
+// Exactly 8 tickers (Twelve Data free tier credit/minute limit).
+// Each symbol = 1 credit, sent as a single comma-separated request.
+// Stocks/ETFs use plain tickers. Crypto uses BTC/USD format.
 const TICKER_MAP = {
-  SPY:   { td: 'SPY'     },
-  QQQ:   { td: 'QQQ'     },
-  USO:   { td: 'USO'     },
-  GLD:   { td: 'GLD'     },
-  SLV:   { td: 'SLV'     },
-  GDX:   { td: 'GDX'     },
-  XLE:   { td: 'XLE'     },
-  BTC:   { td: 'BTC/USD' },
-  ETH:   { td: 'ETH/USD' },
-  SOL:   { td: 'SOL/USD' },
-  VIXY:  { td: 'VIXY'    },
-  UUP:   { td: 'UUP'     },
+  SPY:  'SPY',
+  QQQ:  'QQQ',
+  GLD:  'GLD',
+  SLV:  'SLV',
+  GDX:  'GDX',
+  XLE:  'XLE',
+  BTC:  'BTC/USD',
+  ETH:  'ETH/USD',
 }
 
-async function fetchSeries(symbol, apiKey) {
-  try {
-    const url = `${TD_BASE}/time_series?symbol=${encodeURIComponent(symbol)}&interval=1day&outputsize=${DAYS}&apikey=${apiKey}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) })
+// Build the comma-separated symbol list for a single batched request
+const SYMBOL_LIST = Object.values(TICKER_MAP).join(',')
 
-    if (!res.ok) return { values: null, error: `HTTP ${res.status}` }
-
-    const data = await res.json()
-
-    if (data.status === 'error') {
-      return { values: null, error: data.message || 'API error' }
-    }
-
-    if (!data.values || !Array.isArray(data.values) || data.values.length === 0) {
-      return { values: null, error: 'no data' }
-    }
-
-    // Twelve Data returns newest-first, flip for left-to-right drawing
-    const closes = data.values
-      .map((row) => parseFloat(row.close))
-      .filter((n) => !isNaN(n))
-      .reverse()
-
-    return { values: closes }
-  } catch (err) {
-    return { values: null, error: err.message || 'fetch failed' }
+// Parse Twelve Data batch response shape.
+// When you request multiple symbols, the response is keyed by ticker:
+//   { "SPY": { "values": [...] }, "QQQ": { "values": [...] } }
+// When you request a single symbol, the response is flat:
+//   { "values": [...] }
+function extractBatchValues(data, tdSymbol) {
+  // Try batch shape first (keyed by symbol)
+  const entry = data[tdSymbol]
+  if (entry && Array.isArray(entry.values)) {
+    return parseValues(entry.values)
   }
+  // Fallback to flat shape
+  if (Array.isArray(data.values)) {
+    return parseValues(data.values)
+  }
+  return null
+}
+
+function parseValues(rows) {
+  const closes = rows
+    .map((row) => parseFloat(row.close))
+    .filter((n) => !isNaN(n))
+    .reverse() // oldest first for left-to-right drawing
+  return closes.length >= 2 ? closes : null
 }
 
 export default async function handler(req, res) {
@@ -68,34 +67,35 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'TWELVEDATA_API_KEY not set in Vercel env vars' })
   }
 
-  const symbols = Object.keys(TICKER_MAP)
-  const BATCH_SIZE = 4
-  const GAP_MS = 8000 // 8 seconds between batches
-  const allResults = []
+  try {
+    const url = `${TD_BASE}/time_series?symbol=${encodeURIComponent(SYMBOL_LIST)}&interval=1day&outputsize=${DAYS}&apikey=${apiKey}`
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) })
 
-  for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-    const batch = symbols.slice(i, i + BATCH_SIZE)
-    const batchResults = await Promise.all(
-      batch.map(async (symbol) => {
-        const { td } = TICKER_MAP[symbol]
-        const series = await fetchSeries(td, apiKey)
-        return [symbol, series]
-      })
-    )
-    allResults.push(...batchResults)
-
-    // Gap between batches, but not after the last one
-    if (i + BATCH_SIZE < symbols.length) {
-      await new Promise((r) => setTimeout(r, GAP_MS))
+    if (!response.ok) {
+      return res.status(500).json({ error: `Twelve Data HTTP ${response.status}` })
     }
+
+    const data = await response.json()
+
+    // Whole-response error (API key issue, rate limit, etc)
+    if (data.status === 'error') {
+      return res.status(500).json({ error: data.message || 'API error' })
+    }
+
+    const sparklines = {}
+    for (const [displayKey, tdSymbol] of Object.entries(TICKER_MAP)) {
+      const values = extractBatchValues(data, tdSymbol)
+      sparklines[displayKey] = values
+        ? { values }
+        : { values: null, error: 'no data for ' + tdSymbol }
+    }
+
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200')
+    res.status(200).json({
+      sparklines,
+      fetchedAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'fetch failed' })
   }
-
-  const sparklines = Object.fromEntries(allResults)
-
-  // 10 min edge cache. This function runs at most ~6 times per hour.
-  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200')
-  res.status(200).json({
-    sparklines,
-    fetchedAt: new Date().toISOString(),
-  })
 }

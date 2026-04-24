@@ -37,8 +37,14 @@ function isMarketOpen(d) {
   return minutes >= 510 && minutes < 900
 }
 
+// Merge static list + live API prices.
+// If item has a manualPrice from the sheet, that wins.
+// Otherwise use the live API value.
 function mergePrices(staticList, livePrices) {
   return staticList.map((item) => {
+    if (item.manualPrice != null) {
+      return { ...item, price: item.manualPrice, change: null, isManual: true }
+    }
     const live = livePrices[item.symbol]
     if (live && live.price != null) {
       return { ...item, price: live.price, change: live.change, isLive: true }
@@ -47,23 +53,15 @@ function mergePrices(staticList, livePrices) {
   })
 }
 
-// ============================================================
-// SPARKLINE
-// Tiny inline SVG line chart. Draws a polyline across the
-// available width, scaled to the min/max of the values.
-// Colored green if last > first, red otherwise.
-// ============================================================
 function Sparkline({ values, width = 100, height = 26 }) {
   if (!values || !Array.isArray(values) || values.length < 2) {
-    // No data - render empty space to keep card heights consistent
     return <div style={{ width, height }} />
   }
 
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const range = max - min || 1 // guard against flat line
+  const range = max - min || 1
 
-  // Map each value to an (x, y) coordinate
   const points = values
     .map((v, i) => {
       const x = (i / (values.length - 1)) * width
@@ -73,7 +71,7 @@ function Sparkline({ values, width = 100, height = 26 }) {
     .join(' ')
 
   const positive = values[values.length - 1] >= values[0]
-  const stroke = positive ? '#34d399' : '#fb7185' // emerald-400 / rose-400
+  const stroke = positive ? '#34d399' : '#fb7185'
 
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
@@ -90,7 +88,11 @@ function Sparkline({ values, width = 100, height = 26 }) {
   )
 }
 
-function Change({ change }) {
+function Change({ change, isManual }) {
+  if (isManual) {
+    // Manual prices don't have a computed change - show a small "MANUAL" tag
+    return <span className="text-[9px] font-mono tracking-[0.15em] text-neutral-500 uppercase">Manual</span>
+  }
   if (change == null) return <span className="text-xs font-mono text-neutral-600">--</span>
   const positive = change >= 0
   const arrow = positive ? '\u25B2' : '\u25BC'
@@ -125,7 +127,7 @@ function ScoreboardCard({ item, sparkline }) {
         <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-neutral-400">
           {item.symbol}
         </span>
-        <Change change={item.change} />
+        <Change change={item.change} isManual={item.isManual} />
       </div>
       <div className="font-mono text-xl md:text-2xl text-neutral-100 font-medium mb-2">
         {formatPrice(item.price)}
@@ -149,7 +151,7 @@ function WatchlistCard({ item }) {
           <span className="font-mono text-base text-neutral-100">
             {formatPrice(item.price)}
           </span>
-          <Change change={item.change} />
+          <Change change={item.change} isManual={item.isManual} />
         </div>
       </div>
       <span className="text-[11px] text-neutral-500 sm:hidden block mb-2">{item.name}</span>

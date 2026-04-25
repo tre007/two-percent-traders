@@ -246,7 +246,6 @@ function DeepDive({ deepDive }) {
   )
 }
 
-// Individual archive row - manages its own expanded state
 function ArchiveRow({ post }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -310,6 +309,76 @@ function ArchiveList({ archive }) {
   )
 }
 
+// ============================================================
+// EASTER EGG: "Do Not Press" button in the footer.
+// Click reveals a fullscreen modal with the gorilla image.
+// Click backdrop or close button to dismiss.
+// Locks body scroll while open.
+// ============================================================
+function SecretButton() {
+  const [open, setOpen] = useState(false)
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    if (open) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = original }
+    }
+  }, [open])
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-700 hover:text-rose-400 transition-colors mt-6 cursor-pointer"
+        aria-label="Do not press"
+      >
+        Do not press this button
+      </button>
+
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-md w-full"
+          >
+            <img
+              src="/gorilla.jpg"
+              alt=""
+              className="w-full h-auto block"
+            />
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="absolute top-2 right-2 font-mono text-xs tracking-widest text-neutral-300 hover:text-white bg-black/60 hover:bg-black/80 px-3 py-1.5 transition-colors"
+              aria-label="Close"
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function Footer() {
   return (
     <footer className="border-t border-white/5 mt-16 md:mt-20">
@@ -323,6 +392,7 @@ function Footer() {
             <p className="text-sm text-neutral-400 leading-relaxed">
               A small Discord community of friends tracking macro, metals, crypto, and everything in between. Not advice. Just us sharing what we're watching.
             </p>
+            <SecretButton />
           </div>
           <div className="flex flex-col gap-3 items-start md:items-end">
             <a

@@ -398,7 +398,7 @@ function SecretButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-700 hover:text-rose-400 transition-colors mt-6 cursor-pointer"
+        className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-500 hover:text-rose-400 border border-neutral-800 hover:border-rose-400/50 px-4 py-2 mt-6 transition-colors cursor-pointer"
         aria-label="Do not press"
       >
         Do not press this button

@@ -1,0 +1,29 @@
+{
+  "name": "2% Traders Live Board",
+  "short_name": "2% Traders",
+  "description": "Live market board for the 2% Traders Discord community.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0908",
+  "theme_color": "#0a0908",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -15,6 +15,7 @@ const ACHIEVEMENTS = [
   { id: 'weekend_trader',  title: 'Weekend Trader',    icon: '\uD83D\uDCC5', desc: 'Visited on a weekend.' },
   { id: 'the_lurker',      title: 'The Lurker',        icon: '\uD83D\uDC40', desc: 'Stayed for 5+ minutes.' },
   { id: 'bull_run',        title: 'Bull Run',          icon: '\uD83D\uDC02', desc: 'Visited with 50%+ of the board green.' },
+  { id: 'day_one',         title: 'Day One',           icon: '\uD83D\uDD12', desc: 'Found the founding date.' },
   { id: 'completionist',   title: 'The Completionist', icon: '\uD83C\uDFC6', desc: 'Unlocked everything else.' },
 ]
 const REGULAR_IDS = ACHIEVEMENTS.filter(a => a.id !== 'completionist').map(a => a.id)
@@ -317,21 +318,56 @@ function Snowfall({ active }) {
   )
 }
 
-function Header({ now, onSecretClick }) {
+// Calculate days since founding date (Jan 7, 2021)
+function getDaysSinceFounding() {
+  const founding = new Date(2021, 0, 7) // Jan 7, 2021 - month is 0-indexed
+  const today = new Date()
+  const diffMs = today - founding
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24))
+}
+
+function Header({ now, onSecretClick, dayOneUnlocked, onWordmarkTripleClick }) {
   const open = isMarketOpen(now)
+  const clickCountRef = useRef(0)
+  const clickTimerRef = useRef(null)
+
+  function handleWordmarkClick() {
+    clickCountRef.current += 1
+    clearTimeout(clickTimerRef.current)
+    if (clickCountRef.current >= 3) {
+      clickCountRef.current = 0
+      onWordmarkTripleClick && onWordmarkTripleClick()
+    } else {
+      // Reset count if no third click within 800ms
+      clickTimerRef.current = setTimeout(() => {
+        clickCountRef.current = 0
+      }, 800)
+    }
+  }
+
+  // Cleanup any pending click timer on unmount
+  useEffect(() => () => clearTimeout(clickTimerRef.current), [])
+
+  const tagline = dayOneUnlocked
+    ? `DAY ${getDaysSinceFounding().toLocaleString()}`
+    : 'FRIENDS SINCE 2021'
+
   return (
     <header className="border-b border-white/5 bg-black/40 backdrop-blur-sm sticky top-0 z-10">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-5">
         <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
           <div className="flex items-center gap-3">
             <img src="/logo-icon-header.svg" alt="2% Traders" className="w-16 h-16 md:w-20 md:h-20" />
-            <div>
+            <div
+              onClick={handleWordmarkClick}
+              className="cursor-pointer select-none"
+            >
               <div className="flex items-baseline gap-1.5">
                 <span className="font-serif italic text-brand-amber text-2xl md:text-[1.65rem] leading-none">2%</span>
                 <span className="font-sans font-bold text-neutral-100 tracking-[0.15em] text-sm md:text-base">TRADERS</span>
               </div>
-              <p className="font-mono text-[10px] text-neutral-500 tracking-[0.15em] mt-0.5">
-                FRIENDS SINCE 2021
+              <p className={`font-mono text-[10px] tracking-[0.15em] mt-0.5 transition-colors ${dayOneUnlocked ? 'text-brand-amber/80' : 'text-neutral-500'}`}>
+                {tagline}
               </p>
             </div>
           </div>
@@ -792,6 +828,10 @@ export default function App() {
     unlock('first_press')
   }
 
+  function onWordmarkTripleClick() {
+    unlock('day_one')
+  }
+
   function onArchiveExpand() {
     unlock('deep_reader')
   }
@@ -801,7 +841,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-neutral-200">
-      <Header now={now} onSecretClick={triggerSnow} />
+      <Header
+        now={now}
+        onSecretClick={triggerSnow}
+        dayOneUnlocked={!!unlocked['day_one']}
+        onWordmarkTripleClick={onWordmarkTripleClick}
+      />
       <Snowfall active={snowing} />
       <AchievementToast achievement={toast} />
 

@@ -161,18 +161,23 @@ function WatchlistCard({ item }) {
 // ============================================================
 // SNOWFALL EASTER EGG
 // Triggered by clicking the market status dot in the header.
-// 50 snowflakes drift down at varying speeds for ~5 seconds,
-// then fade out. Pure CSS animation, no library.
+// 120 flakes, spawn-delays spread over 10 seconds, each falls
+// for 5-8 seconds. Total effect lasts ~15 seconds before the
+// last flake clears the bottom of the viewport.
+// Pure CSS animation, no library.
 // ============================================================
 function Snowfall({ active }) {
   if (!active) return null
 
-  // Pre-generate 50 flakes with random properties
+  // Pre-generate 120 flakes with random properties.
+  // Spawn delays spread across 0-10s so snow falls continuously
+  // rather than all at once. Each flake then falls for 5-8s,
+  // putting total effect duration around 15-18 seconds.
   const flakes = Array.from({ length: 120 }, (_, i) => {
     const left = Math.random() * 100             // viewport %
     const fontSize = 10 + Math.random() * 18     // px
-    const delay = Math.random() * 1.5            // sec
-    const duration = 4 + Math.random() * 3       // sec
+    const delay = Math.random() * 10             // sec - spread across full window
+    const duration = 5 + Math.random() * 3       // sec
     const opacity = 0.5 + Math.random() * 0.5
     const drift = (Math.random() - 0.5) * 100    // horizontal drift in px
     return { id: i, left, fontSize, delay, duration, opacity, drift }
@@ -486,7 +491,8 @@ export default function App() {
     clearTimeout(snowTimerRef.current)
     requestAnimationFrame(() => {
       setSnowing(true)
-      snowTimerRef.current = setTimeout(() => setSnowing(false), 7000)
+      // 10s of spawning + up to 8s of falling = ~18s total
+      snowTimerRef.current = setTimeout(() => setSnowing(false), 18000)
     })
   }
 

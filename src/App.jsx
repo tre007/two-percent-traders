@@ -357,11 +357,13 @@ function Header({ now, onSecretClick, dayOneUnlocked, onWordmarkTripleClick }) {
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 md:py-5">
         <div className="flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
           <div className="flex items-center gap-3">
-            <img src="/logo-icon-header.svg" alt="2% Traders" className="w-16 h-16 md:w-20 md:h-20" />
-            <div
+            <img
+              src="/logo-icon-header.svg"
+              alt="2% Traders"
               onClick={handleWordmarkClick}
-              className="cursor-pointer select-none"
-            >
+              className="w-16 h-16 md:w-20 md:h-20 cursor-pointer select-none"
+            />
+            <div>
               <div className="flex items-baseline gap-1.5">
                 <span className="font-serif italic text-brand-amber text-2xl md:text-[1.65rem] leading-none">2%</span>
                 <span className="font-sans font-bold text-neutral-100 tracking-[0.15em] text-sm md:text-base">TRADERS</span>

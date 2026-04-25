@@ -236,19 +236,21 @@ function Header({ now, onSecretClick }) {
             </div>
           </div>
 
-          <div className="font-mono flex items-center gap-2.5 text-[10px] md:text-[11px] text-neutral-400 flex-wrap">
+          <div className="font-mono flex items-center gap-3 text-xs md:text-sm text-neutral-300 flex-wrap">
             <span>{formatDate(now)}</span>
             <span className="text-neutral-700">|</span>
             <span>{formatTime(now)} CT</span>
             <span className="text-neutral-700">|</span>
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onSecretClick}
-                className={`w-1.5 h-1.5 rounded-full cursor-pointer hover:scale-150 transition-transform ${open ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-600'}`}
+                className={`text-base md:text-lg leading-none cursor-pointer hover:scale-125 transition-transform ${open ? 'text-emerald-400 animate-pulse' : 'text-neutral-500'}`}
                 aria-label="Stay frosty"
-              />
-              <span className={open ? 'text-emerald-400' : 'text-neutral-500'}>
+              >
+                *
+              </button>
+              <span className={open ? 'text-emerald-400' : 'text-neutral-400'}>
                 {open ? 'MKT OPEN' : 'MKT CLOSED'}
               </span>
             </span>

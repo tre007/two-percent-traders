@@ -398,11 +398,25 @@ function SecretButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-500 hover:text-rose-400 border border-neutral-800 hover:border-rose-400/50 px-4 py-2 mt-6 transition-colors cursor-pointer"
+        className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-400 hover:text-rose-400 border border-neutral-700 hover:border-rose-400/50 px-4 py-2 mt-6 transition-colors cursor-pointer inline-flex items-center gap-2 secret-pulse"
         aria-label="Do not press"
       >
+        <span className="text-rose-400/80" aria-hidden="true">!</span>
         Do not press this button
       </button>
+
+      <style>{`
+        @keyframes secret-pulse-anim {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(251, 113, 133, 0); }
+          50%      { box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.18); }
+        }
+        .secret-pulse {
+          animation: secret-pulse-anim 2.5s ease-in-out infinite;
+        }
+        .secret-pulse:hover {
+          animation: none;
+        }
+      `}</style>
 
       {open && (
         <div

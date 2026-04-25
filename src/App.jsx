@@ -604,9 +604,7 @@ function TrophyButton({ unlocked }) {
   const [open, setOpen] = useState(false)
   const unlockedCount = Object.keys(unlocked).length
 
-  // Hide button until 3+ achievements
-  if (unlockedCount < 3) return null
-
+  // All hooks must be called unconditionally before any early return
   useEffect(() => {
     if (open) {
       const original = document.body.style.overflow
@@ -623,6 +621,9 @@ function TrophyButton({ unlocked }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
+
+  // Hide button until 3+ achievements (early return AFTER hooks)
+  if (unlockedCount < 3) return null
 
   return (
     <>

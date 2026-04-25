@@ -168,7 +168,7 @@ function Snowfall({ active }) {
   if (!active) return null
 
   // Pre-generate 50 flakes with random properties
-  const flakes = Array.from({ length: 50 }, (_, i) => {
+  const flakes = Array.from({ length: 120 }, (_, i) => {
     const left = Math.random() * 100             // viewport %
     const fontSize = 10 + Math.random() * 18     // px
     const delay = Math.random() * 1.5            // sec

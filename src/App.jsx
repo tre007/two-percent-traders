@@ -1,9 +1,104 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { scoreboard as scoreboardStatic, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
 import { useSparklines } from './useSparklines'
 
+// ============================================================
+// ACHIEVEMENT DEFINITIONS
+// ============================================================
+const ACHIEVEMENTS = [
+  { id: 'first_press',     title: 'First Press',       icon: '\uD83E\uDD8D', desc: 'Pressed the gorilla button.' },
+  { id: 'stay_frosty',     title: 'Stay Frosty',       icon: '\u2744',       desc: 'Summoned the snow.' },
+  { id: 'deep_reader',     title: 'Deep Reader',       icon: '\uD83D\uDCD6', desc: 'Read a past deep dive.' },
+  { id: 'night_owl',       title: 'Night Owl',         icon: '\uD83C\uDF19', desc: 'Visited between midnight and 5am CT.' },
+  { id: 'weekend_trader',  title: 'Weekend Trader',    icon: '\uD83D\uDCC5', desc: 'Visited on a weekend.' },
+  { id: 'the_lurker',      title: 'The Lurker',        icon: '\uD83D\uDC40', desc: 'Stayed for 5+ minutes.' },
+  { id: 'bull_run',        title: 'Bull Run',          icon: '\uD83D\uDC02', desc: 'Visited with 50%+ of the board green.' },
+  { id: 'completionist',   title: 'The Completionist', icon: '\uD83C\uDFC6', desc: 'Unlocked everything else.' },
+]
+const REGULAR_IDS = ACHIEVEMENTS.filter(a => a.id !== 'completionist').map(a => a.id)
+const STORAGE_KEY = 'twopct_achievements_v1'
+
+// ============================================================
+// useAchievements -- single hook managing unlock state
+// ============================================================
+function useAchievements() {
+  const [unlocked, setUnlocked] = useState({})  // id -> ISO date string
+  const [toast, setToast] = useState(null)      // achievement to display
+  const toastTimerRef = useRef(null)
+  const queueRef = useRef([])                   // pending toasts
+
+  // Load saved achievements on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && typeof parsed === 'object') setUnlocked(parsed)
+      }
+    } catch (err) {
+      // localStorage might be unavailable (private mode etc) - silently continue
+    }
+  }, [])
+
+  // Save whenever unlocked changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(unlocked))
+    } catch (err) {
+      // ignore
+    }
+  }, [unlocked])
+
+  // Process the toast queue: show next, set timer to dismiss
+  const showNextToast = useCallback(() => {
+    if (queueRef.current.length === 0) return
+    const next = queueRef.current.shift()
+    setToast(next)
+    clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null)
+      // Wait for fade-out animation, then check for next
+      setTimeout(() => showNextToast(), 400)
+    }, 4000)
+  }, [])
+
+  // Unlock an achievement (no-op if already unlocked)
+  const unlock = useCallback((id) => {
+    setUnlocked(prev => {
+      if (prev[id]) return prev
+      const ach = ACHIEVEMENTS.find(a => a.id === id)
+      if (!ach) return prev
+
+      const next = { ...prev, [id]: new Date().toISOString() }
+
+      // Queue the toast for this unlock
+      queueRef.current.push(ach)
+      // If no toast currently showing, kick off the queue
+      if (!toast) {
+        // Defer to next tick so state updates can settle
+        setTimeout(() => showNextToast(), 0)
+      }
+
+      // Check completionist - if all REGULAR_IDS are unlocked, queue it too
+      const allDone = REGULAR_IDS.every(rid => next[rid])
+      if (allDone && !next['completionist']) {
+        next['completionist'] = new Date().toISOString()
+        const compl = ACHIEVEMENTS.find(a => a.id === 'completionist')
+        queueRef.current.push(compl)
+      }
+
+      return next
+    })
+  }, [toast, showNextToast])
+
+  return { unlocked, toast, unlock }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
 function formatPrice(price) {
   if (price == null) return '--'
   if (price >= 10000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -37,6 +132,20 @@ function isMarketOpen(d) {
   return minutes >= 510 && minutes < 900
 }
 
+function getCTHour(d) {
+  return parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    hour: '2-digit', hour12: false,
+  }).format(d))
+}
+
+function getCTWeekday(d) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    weekday: 'short',
+  }).format(d)
+}
+
 function mergePrices(staticList, livePrices) {
   return staticList.map((item) => {
     if (item.manualPrice != null) {
@@ -50,6 +159,9 @@ function mergePrices(staticList, livePrices) {
   })
 }
 
+// ============================================================
+// COMPONENTS
+// ============================================================
 function Sparkline({ values, width = 100, height = 26 }) {
   if (!values || !Array.isArray(values) || values.length < 2) {
     return <div style={{ width, height }} />
@@ -158,28 +270,16 @@ function WatchlistCard({ item }) {
   )
 }
 
-// ============================================================
-// SNOWFALL EASTER EGG
-// Triggered by clicking the market status dot in the header.
-// 120 flakes, spawn-delays spread over 10 seconds, each falls
-// for 5-8 seconds. Total effect lasts ~15 seconds before the
-// last flake clears the bottom of the viewport.
-// Pure CSS animation, no library.
-// ============================================================
 function Snowfall({ active }) {
   if (!active) return null
 
-  // Pre-generate 120 flakes with random properties.
-  // Spawn delays spread across 0-10s so snow falls continuously
-  // rather than all at once. Each flake then falls for 5-8s,
-  // putting total effect duration around 15-18 seconds.
   const flakes = Array.from({ length: 120 }, (_, i) => {
-    const left = Math.random() * 100             // viewport %
-    const fontSize = 10 + Math.random() * 18     // px
-    const delay = Math.random() * 10             // sec - spread across full window
-    const duration = 5 + Math.random() * 3       // sec
+    const left = Math.random() * 100
+    const fontSize = 10 + Math.random() * 18
+    const delay = Math.random() * 10
+    const duration = 5 + Math.random() * 3
     const opacity = 0.5 + Math.random() * 0.5
-    const drift = (Math.random() - 0.5) * 100    // horizontal drift in px
+    const drift = (Math.random() - 0.5) * 100
     return { id: i, left, fontSize, delay, duration, opacity, drift }
   })
 
@@ -203,7 +303,7 @@ function Snowfall({ active }) {
             ['--drift']: `${f.drift}px`,
           }}
         >
-          *
+          {'\u2744'}
         </span>
       ))}
 
@@ -312,14 +412,20 @@ function DeepDive({ deepDive }) {
   )
 }
 
-function ArchiveRow({ post }) {
+function ArchiveRow({ post, onExpand }) {
   const [expanded, setExpanded] = useState(false)
+
+  function toggle() {
+    const next = !expanded
+    setExpanded(next)
+    if (next && onExpand) onExpand()
+  }
 
   return (
     <div className="border-b border-white/5 last:border-b-0">
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={toggle}
         className="w-full text-left py-4 md:py-5 hover:bg-white/[0.015] transition-colors px-0"
       >
         <div className="flex items-baseline justify-between gap-4 flex-wrap md:flex-nowrap">
@@ -363,19 +469,19 @@ function ArchiveRow({ post }) {
   )
 }
 
-function ArchiveList({ archive }) {
+function ArchiveList({ archive, onExpand }) {
   if (!archive || archive.length === 0) return null
 
   return (
     <div className="border-t border-white/5">
       {archive.map((post) => (
-        <ArchiveRow key={post.issue} post={post} />
+        <ArchiveRow key={post.issue} post={post} onExpand={onExpand} />
       ))}
     </div>
   )
 }
 
-function SecretButton() {
+function SecretButton({ onPress }) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -395,11 +501,16 @@ function SecretButton() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
+  function handleClick() {
+    setOpen(true)
+    if (onPress) onPress()
+  }
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className="font-mono text-[10px] tracking-[0.2em] uppercase text-neutral-400 hover:text-rose-400 border border-neutral-700 hover:border-rose-400/50 px-4 py-2 mt-6 transition-colors cursor-pointer inline-flex items-center gap-2 secret-pulse"
         aria-label="Do not press"
       >
@@ -451,7 +562,142 @@ function SecretButton() {
   )
 }
 
-function Footer() {
+// ============================================================
+// ACHIEVEMENT TOAST: slide-in notification at bottom-right
+// ============================================================
+function AchievementToast({ achievement }) {
+  if (!achievement) return null
+
+  return (
+    <div
+      className="fixed bottom-4 right-4 z-50 max-w-xs pointer-events-none"
+      style={{ animation: 'toast-slide 4s ease-in-out forwards' }}
+    >
+      <div className="border border-brand-amber/60 bg-black/95 backdrop-blur-sm px-4 py-3 flex items-center gap-3 shadow-lg">
+        <span className="text-2xl">{achievement.icon}</span>
+        <div>
+          <div className="font-mono text-[9px] tracking-[0.2em] uppercase text-brand-amber/80">
+            Achievement Unlocked
+          </div>
+          <div className="font-sans text-sm text-neutral-100 font-semibold mt-0.5">
+            {achievement.title}
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes toast-slide {
+          0%   { transform: translateY(20px); opacity: 0; }
+          8%   { transform: translateY(0); opacity: 1; }
+          92%  { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(20px); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ============================================================
+// TROPHY MODAL: list of all achievements (locked + unlocked)
+// ============================================================
+function TrophyButton({ unlocked }) {
+  const [open, setOpen] = useState(false)
+  const unlockedCount = Object.keys(unlocked).length
+
+  // Hide button until 3+ achievements
+  if (unlockedCount < 3) return null
+
+  useEffect(() => {
+    if (open) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = original }
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="font-mono text-[10px] tracking-[0.2em] uppercase text-brand-amber/70 hover:text-brand-amber border border-brand-amber/30 hover:border-brand-amber/70 px-4 py-2 mt-3 transition-colors cursor-pointer inline-flex items-center gap-2"
+        aria-label="View achievements"
+      >
+        <span aria-hidden="true">{'\uD83C\uDFC6'}</span>
+        Achievements ({unlockedCount}/{ACHIEVEMENTS.length})
+      </button>
+
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-black border border-brand-amber/30 max-w-lg w-full max-h-[85vh] overflow-y-auto"
+          >
+            <div className="p-6 md:p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-mono text-[11px] tracking-[0.25em] uppercase text-brand-amber/90">
+                  Achievements // {unlockedCount}/{ACHIEVEMENTS.length}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="font-mono text-[10px] tracking-widest text-neutral-500 hover:text-white transition-colors"
+                  aria-label="Close"
+                >
+                  CLOSE
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {ACHIEVEMENTS.map((ach) => {
+                  const isUnlocked = !!unlocked[ach.id]
+                  return (
+                    <div
+                      key={ach.id}
+                      className={`border ${isUnlocked ? 'border-brand-amber/30 bg-brand-amber/5' : 'border-white/5 bg-white/[0.015]'} p-3 flex items-center gap-3`}
+                    >
+                      <span className={`text-2xl ${isUnlocked ? '' : 'grayscale opacity-30'}`}>
+                        {ach.icon}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-sans font-semibold text-sm ${isUnlocked ? 'text-neutral-100' : 'text-neutral-600'}`}>
+                          {isUnlocked ? ach.title : '???'}
+                        </div>
+                        <div className={`text-xs leading-snug mt-0.5 ${isUnlocked ? 'text-neutral-400' : 'text-neutral-700'}`}>
+                          {isUnlocked ? ach.desc : 'Locked'}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <p className="font-mono text-[10px] text-neutral-600 tracking-wider mt-6 text-center">
+                Stay frosty.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function Footer({ unlocked, onPressGorilla }) {
   return (
     <footer className="border-t border-white/5 mt-16 md:mt-20">
       <div className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-12">
@@ -464,7 +710,8 @@ function Footer() {
             <p className="text-sm text-neutral-400 leading-relaxed">
               A small Discord community of friends tracking macro, metals, crypto, and everything in between. Not advice. Just us sharing what we're watching.
             </p>
-            <SecretButton />
+            <SecretButton onPress={onPressGorilla} />
+            <TrophyButton unlocked={unlocked} />
           </div>
           <div className="flex flex-col gap-3 items-start md:items-end">
             <a
@@ -485,6 +732,9 @@ function Footer() {
   )
 }
 
+// ============================================================
+// MAIN APP
+// ============================================================
 export default function App() {
   const [now, setNow] = useState(new Date())
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
@@ -492,24 +742,57 @@ export default function App() {
   const { sparklines } = useSparklines()
   const [snowing, setSnowing] = useState(false)
   const snowTimerRef = useRef(null)
+  const { unlocked, toast, unlock } = useAchievements()
+  const visitStartRef = useRef(Date.now())
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  // Cleanup any pending snowfall timer on unmount
   useEffect(() => () => clearTimeout(snowTimerRef.current), [])
 
+  // Time-of-day achievements - check on mount
+  useEffect(() => {
+    const d = new Date()
+    const hour = getCTHour(d)
+    const weekday = getCTWeekday(d)
+    if (hour >= 0 && hour < 5) unlock('night_owl')
+    if (weekday === 'Sat' || weekday === 'Sun') unlock('weekend_trader')
+  }, [unlock])
+
+  // Lurker achievement: 5+ minutes on the page
+  useEffect(() => {
+    const t = setTimeout(() => unlock('the_lurker'), 5 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [unlock])
+
+  // Bull run achievement: check whenever prices update
+  useEffect(() => {
+    const tickers = scoreboardStatic.map((item) => prices[item.symbol]).filter(Boolean)
+    if (tickers.length < 6) return // need at least half the board for meaningful signal
+    const greenCount = tickers.filter((t) => t.change != null && t.change > 0).length
+    if (greenCount / tickers.length >= 0.5) {
+      unlock('bull_run')
+    }
+  }, [prices, unlock])
+
   function triggerSnow() {
-    // Restart the animation each click - clear any old flakes first
     setSnowing(false)
     clearTimeout(snowTimerRef.current)
     requestAnimationFrame(() => {
       setSnowing(true)
-      // 10s of spawning + up to 8s of falling = ~18s total
       snowTimerRef.current = setTimeout(() => setSnowing(false), 18000)
     })
+    unlock('stay_frosty')
+  }
+
+  function onGorillaPress() {
+    unlock('first_press')
+  }
+
+  function onArchiveExpand() {
+    unlock('deep_reader')
   }
 
   const scoreboard = mergePrices(scoreboardStatic, prices)
@@ -519,6 +802,7 @@ export default function App() {
     <div className="min-h-screen bg-black text-neutral-200">
       <Header now={now} onSecretClick={triggerSnow} />
       <Snowfall active={snowing} />
+      <AchievementToast achievement={toast} />
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
         <section className="mb-14 md:mb-20">
@@ -552,12 +836,12 @@ export default function App() {
         {archive && archive.length > 0 && (
           <section>
             <SectionLabel>The Archive // Past Deep Dives</SectionLabel>
-            <ArchiveList archive={archive} />
+            <ArchiveList archive={archive} onExpand={onArchiveExpand} />
           </section>
         )}
       </main>
 
-      <Footer />
+      <Footer unlocked={unlocked} onPressGorilla={onGorillaPress} />
     </div>
   )
 }

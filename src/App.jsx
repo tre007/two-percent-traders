@@ -248,7 +248,7 @@ function Header({ now, onSecretClick }) {
                 className={`text-base md:text-lg leading-none cursor-pointer hover:scale-125 transition-transform ${open ? 'text-emerald-400 animate-pulse' : 'text-neutral-500'}`}
                 aria-label="Stay frosty"
               >
-                *
+                {'\u2744'}
               </button>
               <span className={open ? 'text-emerald-400' : 'text-neutral-400'}>
                 {open ? 'MKT OPEN' : 'MKT CLOSED'}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { scoreboard as scoreboardStatic, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
@@ -158,7 +158,61 @@ function WatchlistCard({ item }) {
   )
 }
 
-function Header({ now }) {
+// ============================================================
+// SNOWFALL EASTER EGG
+// Triggered by clicking the market status dot in the header.
+// 50 snowflakes drift down at varying speeds for ~5 seconds,
+// then fade out. Pure CSS animation, no library.
+// ============================================================
+function Snowfall({ active }) {
+  if (!active) return null
+
+  // Pre-generate 50 flakes with random properties
+  const flakes = Array.from({ length: 50 }, (_, i) => {
+    const left = Math.random() * 100             // viewport %
+    const fontSize = 10 + Math.random() * 18     // px
+    const delay = Math.random() * 1.5            // sec
+    const duration = 4 + Math.random() * 3       // sec
+    const opacity = 0.5 + Math.random() * 0.5
+    const drift = (Math.random() - 0.5) * 100    // horizontal drift in px
+    return { id: i, left, fontSize, delay, duration, opacity, drift }
+  })
+
+  return (
+    <div
+      className="fixed inset-0 pointer-events-none z-40 overflow-hidden"
+      aria-hidden="true"
+    >
+      {flakes.map((f) => (
+        <span
+          key={f.id}
+          className="absolute select-none"
+          style={{
+            left: `${f.left}%`,
+            top: '-30px',
+            fontSize: `${f.fontSize}px`,
+            opacity: f.opacity,
+            color: '#cfe7f5',
+            textShadow: '0 0 6px rgba(207, 231, 245, 0.6)',
+            animation: `frosty-fall ${f.duration}s ${f.delay}s linear forwards`,
+            ['--drift']: `${f.drift}px`,
+          }}
+        >
+          *
+        </span>
+      ))}
+
+      <style>{`
+        @keyframes frosty-fall {
+          0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+          100% { transform: translate3d(var(--drift), 105vh, 0) rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function Header({ now, onSecretClick }) {
   const open = isMarketOpen(now)
   return (
     <header className="border-b border-white/5 bg-black/40 backdrop-blur-sm sticky top-0 z-10">
@@ -183,7 +237,12 @@ function Header({ now }) {
             <span>{formatTime(now)} CT</span>
             <span className="text-neutral-700">|</span>
             <span className="flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${open ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-600'}`}></span>
+              <button
+                type="button"
+                onClick={onSecretClick}
+                className={`w-1.5 h-1.5 rounded-full cursor-pointer hover:scale-150 transition-transform ${open ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-600'}`}
+                aria-label="Stay frosty"
+              />
               <span className={open ? 'text-emerald-400' : 'text-neutral-500'}>
                 {open ? 'MKT OPEN' : 'MKT CLOSED'}
               </span>
@@ -309,16 +368,9 @@ function ArchiveList({ archive }) {
   )
 }
 
-// ============================================================
-// EASTER EGG: "Do Not Press" button in the footer.
-// Click reveals a fullscreen modal with the gorilla image.
-// Click backdrop or close button to dismiss.
-// Locks body scroll while open.
-// ============================================================
 function SecretButton() {
   const [open, setOpen] = useState(false)
 
-  // Lock body scroll while modal is open
   useEffect(() => {
     if (open) {
       const original = document.body.style.overflow
@@ -327,7 +379,6 @@ function SecretButton() {
     }
   }, [open])
 
-  // Close on Escape key
   useEffect(() => {
     if (!open) return
     function onKey(e) {
@@ -418,18 +469,34 @@ export default function App() {
   const { prices, loading, error, lastUpdated, isStale } = useLivePrices()
   const { watchlist: watchlistContent, deepDive, archive } = useLiveContent(watchlistStatic, deepDiveStatic)
   const { sparklines } = useSparklines()
+  const [snowing, setSnowing] = useState(false)
+  const snowTimerRef = useRef(null)
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(interval)
   }, [])
 
+  // Cleanup any pending snowfall timer on unmount
+  useEffect(() => () => clearTimeout(snowTimerRef.current), [])
+
+  function triggerSnow() {
+    // Restart the animation each click - clear any old flakes first
+    setSnowing(false)
+    clearTimeout(snowTimerRef.current)
+    requestAnimationFrame(() => {
+      setSnowing(true)
+      snowTimerRef.current = setTimeout(() => setSnowing(false), 7000)
+    })
+  }
+
   const scoreboard = mergePrices(scoreboardStatic, prices)
   const watchlist = mergePrices(watchlistContent, prices)
 
   return (
     <div className="min-h-screen bg-black text-neutral-200">
-      <Header now={now} />
+      <Header now={now} onSecretClick={triggerSnow} />
+      <Snowfall active={snowing} />
 
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
         <section className="mb-14 md:mb-20">

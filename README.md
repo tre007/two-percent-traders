@@ -1,132 +1,140 @@
-# 2% Traders · Live Board
+# 2% Traders - Live Board
 
-Live market board for your Discord community. Real prices via Finnhub. Content (watchlist thesis + weekly deep dive) edited from your phone via Google Sheets.
+> Live market board for a small Discord community. Real-time prices via Finnhub, 7-day trend sparklines via Twelve Data, content (watchlist thesis + weekly deep dives + archive) edited from a phone via Google Sheets. Deployed on Vercel.
 
-**Stage 4 of 5.** Now has live prices AND live content.
+**Live site:** https://two-percent-traders.vercel.app
+
+---
+
+## What it does
+
+- **Live scoreboard** -- 12 tickers covering stocks, commodities, crypto, and dollar/volatility indexes. Prices auto-refresh every 30 seconds. 8 of them show 7-day sparkline trends next to the price.
+- **Watchlist** -- 15+ tickers the group is tracking, each with a 1-2 sentence thesis. Supports manual price overrides for things the live API can't track (spot gold, physical silver, oil per barrel).
+- **Weekly Deep Dive** -- featured long-form post rendered as the bottom hero section. Links back to the original Discord post.
+- **Archive** -- expandable list of past Deep Dives. Click to read the summary, click the link to read the full post on Discord.
+- **Live content pipeline** -- the entire watchlist + deep dive + archive is edited from a Google Sheet. No code changes required for weekly updates.
+- **Secret button** -- there's an easter egg in the footer. Don't press it.
+
+---
+
+## Stack
+
+- **Vite + React 18 + Tailwind CSS** on the frontend (single-page, one scroll)
+- **Vercel serverless functions** for all API routes
+- **Finnhub free tier** for live price quotes (30s refresh)
+- **Twelve Data free tier** for 7-day sparkline history (cached 10 min edge)
+- **Google Sheets (published CSV)** for content that changes weekly
+- **Deployed to Vercel** with auto-deploy on every `main` commit
 
 ---
 
 ## Folder structure
 
-- **`src/App.jsx`** — the UI code
-- **`src/data.js`** — fallback content + scoreboard tickers + Discord link
-- **`src/useLivePrices.js`** — React hook for prices (refreshes every 30s)
-- **`src/useLiveContent.js`** — React hook for content (refreshes on page load)
-- **`api/prices.js`** — serverless function calling Finnhub
-- **`api/content.js`** — serverless function fetching Google Sheets
-- **`public/`** — logos and favicons
-- **`sheet_templates/`** — CSV templates to paste into Google Sheets on first setup
+```
+src/
+  App.jsx              UI code -- scoreboard, watchlist, deep dive, archive, footer
+  data.js              Fallback content + scoreboard tickers + Discord URL
+  useLivePrices.js     React hook, refreshes prices every 30s
+  useLiveContent.js    React hook, reads from Google Sheets on page load
+  useSparklines.js     React hook, fetches 7-day history once on mount
+
+api/
+  prices.js            Serverless function, fetches Finnhub live prices
+  content.js           Serverless function, parses Google Sheets CSV
+  sparklines.js        Serverless function, fetches Twelve Data 7d history
+
+public/
+  logo-icon.svg            Full badge logo (for social, favicon sources)
+  logo-icon-header.svg     Simplified logo (ring + 2% + EST 2021), used in header
+  logo-primary.svg         Logo with wordmark
+  logo-hero-1024.png       Social card / OG image
+  favicon-32.png           Browser tab favicon
+  favicon-192.png          Mobile home screen favicon
+  gorilla.jpg              Easter egg image
+
+index.html           Page shell, meta tags, OG tags
+tailwind.config.js   Brand colors (brand-amber, brand-dark) and font tokens
+```
 
 ---
 
-## Full deployment setup
+## Deployment setup
 
-You need two Vercel environment variables:
+### Required environment variables in Vercel
 
-| Variable | Value | How to get it |
-|---|---|---|
-| `FINNHUB_API_KEY` | your Finnhub API key | finnhub.io dashboard |
-| `GOOGLE_SHEET_ID` | your Google Sheet ID | see below |
+| Name | Purpose |
+|---|---|
+| `FINNHUB_API_KEY` | Live prices. Free tier at finnhub.io |
+| `TWELVEDATA_API_KEY` | 7-day sparkline history. Free tier at twelvedata.com |
+| `GOOGLE_PUBLISH_ID` | The `2PACX-...` ID from File > Publish to web |
+| `GOOGLE_WATCHLIST_GID` | Numeric tab ID for the watchlist tab |
+| `GOOGLE_DEEPDIVE_GID` | Numeric tab ID for the deepdive tab |
 
-### Step 1: Create the Google Sheet
+All five must be set in Production AND Preview environments. After changing any env var, Vercel requires a new deployment to pick it up.
 
-1. Go to [sheets.google.com](https://sheets.google.com) → blank sheet
-2. Name the first tab exactly **`watchlist`** (case-sensitive)
-3. Open `sheet_templates/watchlist.csv` from this project, copy everything, paste into A1 → choose "split text into columns" if prompted
-4. At the bottom, click + to add a second tab. Name it **`deepdive`** (one word, lowercase)
-5. Open `sheet_templates/deepdive.csv`, copy everything, paste into A1
+### Google Sheet structure
 
-### Step 2: Make it public (read-only)
+**Tab `watchlist`** -- columns: `symbol`, `name`, `thesis`, `price` (optional)
+- One row per ticker
+- `price` column is optional. When filled, site uses that value instead of live API (useful for spot gold, oil, etc.)
 
-The function reads the sheet anonymously. This is only possible if sharing is set to "Anyone with the link".
+**Tab `deepdive`** -- columns: `issue`, `date`, `title`, `summary`, `discordUrl`
+- Row 2 (first data row) = current featured Deep Dive
+- Rows 3+ = archive, newest first
+- To update weekly: right-click row 2 > Insert 1 row above > fill in new content. Old post automatically becomes archive.
 
-1. File → Share → "General access" → change to **Anyone with the link** → **Viewer**
-2. Copy the URL from your browser. It looks like:
-   `https://docs.google.com/spreadsheets/d/`**`1A2B3c4D5eF6g7H8iJ9k0LMN`**`/edit#gid=0`
-3. The bolded part (between `/d/` and `/edit`) is your **Sheet ID**
-
-### Step 3: Add both env vars to Vercel
-
-Vercel → your project → Settings → Environment Variables:
-
-- `FINNHUB_API_KEY` = your Finnhub key
-- `GOOGLE_SHEET_ID` = the ID you just copied
-
-Check all three environments (Production, Preview, Development). Redeploy.
-
-### Step 4: Verify
-
-Open your live URL. You should see:
-- Scoreboard with real prices
-- Watchlist rendered from your Sheet
-- Deep dive from your Sheet
-- Status bar: `LIVE // UPDATED [time] CT // AUTO-REFRESH 30S`
+Both tabs must be published via File > Share > Publish to web, format "Comma-separated values (.csv)". Use the GID from the published URL for the env var.
 
 ---
 
-## How to update content going forward
+## Weekly content workflow
 
-### Watchlist thesis
+1. Open Google Sheet on phone
+2. Go to `deepdive` tab
+3. Right-click row 2 > Insert 1 row above
+4. Fill in 5 columns: issue, date, title, summary, discordUrl
+5. Save. Wait ~5 min for edge cache to clear. Site updates.
 
-Open the sheet (phone or desktop). Edit the `thesis` column on any row. Save.
-
-Site picks it up within 5 minutes (edge cache). To force an immediate refresh, hard-reload your site after a minute or so.
-
-### Weekly deep dive
-
-Open the `deepdive` tab. One row, five columns. Just overwrite:
-- `issue` — the week number (15, 16, 17...)
-- `date` — e.g. `APRIL 30, 2026`
-- `title` — the headline (keep it short, it's displayed at 48px)
-- `summary` — 2-3 sentences. Avoid line breaks.
-- `discordUrl` — right-click the Discord message → Copy Message Link
-
-### Add/remove watchlist tickers
-
-Add a row with `symbol`, `name`, `thesis`.
-
-For prices to show up, the symbol also needs to be in `api/prices.js` → `TICKER_MAP`. If you add a new ticker that isn't in the map, the card renders but price shows `—`.
-
----
-
-## What's still edited in code (not Sheets)
-
-- **Scoreboard tickers** (`src/data.js`) — these almost never change
-- **Discord invite URL** (`src/data.js`) — one-time setting
-- **Ticker-to-Finnhub mapping** (`api/prices.js`) — only touched when adding a new ticker
+To update a watchlist thesis, just edit the `thesis` column in the `watchlist` tab. Same 5-minute cache.
 
 ---
 
 ## Local development
 
-Same as before. `vercel dev` if you want the API functions to work locally, else `npm run dev` and the UI gracefully falls back to `data.js` values.
+```bash
+npm install
+npm run dev       # starts Vite at localhost:5173
+npm run build     # production build to dist/
+```
+
+Local development won't hit the serverless functions unless you run `vercel dev` instead of `npm run dev`. For UI work, the app falls back to the values in `src/data.js` if the APIs are unreachable.
 
 ---
 
-## Troubleshooting
+## Design notes
 
-**Watchlist shows data.js values, not Sheets values**
-- Sheet isn't public. Re-check "Anyone with the link" is set
-- `GOOGLE_SHEET_ID` env var is wrong or missing in Vercel
-- Tab names are wrong — they must be exactly `watchlist` and `deepdive` (lowercase, no space)
-
-**Changes to the Sheet don't appear**
-- 5-minute edge cache. Wait a bit or hard-reload.
-- If still nothing after 10 minutes, check Vercel Functions logs for the `/api/content` call
-
-**Deep dive shows fallback values**
-- The `deepdive` tab needs at least the `title` column filled in
-- Headers in row 1 must exactly be: `issue, date, title, summary, discordUrl`
+- **Pure black background** (`bg-black`). Amber brand accents pop harder against it than against dark gray.
+- **Font pairing:** Instrument Serif italic for editorial moments, Archivo sans-serif for UI, JetBrains Mono for data.
+- **Brand amber:** `#d4a256` -- warm gold, slightly desaturated. Used for logo, ticker labels, section dividers, CTAs.
+- **Card background on scoreboard:** subtle amber gradient (`rgba(212, 162, 86, 0.06)`) keeps cards readable on pure black.
+- **Mobile-first.** Everything scales down cleanly. Header logo shrinks to 64px on mobile, 80px on desktop.
 
 ---
 
-## Stage 5 (next)
+## Known constraints
 
-- Custom domain
-- Social share card perfection (the 1200x630 image that previews on Twitter/iMessage)
-- SEO polish (meta description, sitemap, robots.txt)
-- Final QA before sharing publicly
+- **Twelve Data free tier is 8 credits/minute.** Sparklines are intentionally limited to 8 tickers (SPY, QQQ, GLD, SLV, GDX, XLE, BTC, ETH). The other 4 scoreboard tickers render without a trend line.
+- **Finnhub free tier dropped `/stock/candle`** (that's why sparklines use Twelve Data).
+- **No live oil spot price** on free tiers that can be accessed reliably. OIL card in the watchlist uses a manual price updated weekly.
+- **Edge cache on /api/content is 5 minutes.** Sheet edits don't appear instantly.
+- **Browser storage APIs are not used anywhere** -- all state is in-memory per session.
 
 ---
 
-Not financial advice. For entertainment only. Stay frosty.
+## Built with Claude
+
+This entire project, start to ship, was built in one weekend session with Claude Opus as a technical co-founder. Zero prior web dev experience required. If you want to build something like this and don't know how, that's the move.
+
+---
+
+*Not financial advice. Stay frosty.*

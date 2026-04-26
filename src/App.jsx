@@ -860,7 +860,7 @@ export default function App() {
             return (
               <div key={category.label} className="mb-6 md:mb-8 last:mb-0">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-neutral-500">
+                  <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-brand-amber/70">
                     {category.label}
                   </span>
                   <div className="h-px bg-white/5 flex-1"></div>

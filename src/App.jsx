@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { scoreboard as scoreboardStatic, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
+import { scoreboard as scoreboardStatic, scoreboardCategories, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
 import { useSparklines } from './useSparklines'
@@ -838,7 +838,6 @@ export default function App() {
     unlock('deep_reader')
   }
 
-  const scoreboard = mergePrices(scoreboardStatic, prices)
   const watchlist = mergePrices(watchlistContent, prices)
 
   return (
@@ -855,15 +854,30 @@ export default function App() {
       <main className="max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
         <section className="mb-14 md:mb-20">
           <SectionLabel>The Scoreboard // Live</SectionLabel>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
-            {scoreboard.map((item) => (
-              <ScoreboardCard
-                key={item.symbol}
-                item={item}
-                sparkline={sparklines[item.symbol]?.values}
-              />
-            ))}
-          </div>
+
+          {scoreboardCategories.map((category) => {
+            const merged = mergePrices(category.tickers, prices)
+            return (
+              <div key={category.label} className="mb-6 md:mb-8 last:mb-0">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="font-mono text-[10px] tracking-[0.22em] uppercase text-neutral-500">
+                    {category.label}
+                  </span>
+                  <div className="h-px bg-white/5 flex-1"></div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
+                  {merged.map((item) => (
+                    <ScoreboardCard
+                      key={item.symbol}
+                      item={item}
+                      sparkline={sparklines[item.symbol]?.values}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
           <LiveStatus loading={loading} error={error} lastUpdated={lastUpdated} isStale={isStale} />
         </section>
 

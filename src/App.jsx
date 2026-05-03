@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { scoreboard as scoreboardStatic, scoreboardCategories, watchlist as watchlistStatic, deepDive as deepDiveStatic, discordInviteUrl } from './data'
 import { useLivePrices } from './useLivePrices'
 import { useLiveContent } from './useLiveContent'
@@ -842,6 +843,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-black text-neutral-200">
+      <Analytics />
       <Header
         now={now}
         onSecretClick={triggerSnow}

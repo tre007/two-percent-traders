@@ -200,7 +200,7 @@ function Sparkline({ values, width = 100, height = 26 }) {
 
 function Change({ change, isManual }) {
   if (isManual) {
-    return <span className="text-[9px] font-mono tracking-[0.15em] text-neutral-500 uppercase">Manual</span>
+    return null
   }
   if (change == null) return <span className="text-xs font-mono text-neutral-600">--</span>
   const positive = change >= 0
